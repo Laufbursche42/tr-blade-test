@@ -2,8 +2,9 @@
 // identity, the string the app calls the FIN and the Bluetooth module advertises as
 // its name.
 //
-// Nothing here looks at the model. The chooser offers every Bluetooth device and the
-// write goes to whatever accepted the link, which is the point of this tool.
+// Nothing here looks at the model. The chooser lists devices whose name starts with
+// TDE or T1DE, and the write goes to whatever accepted the link, which is the point
+// of this tool.
 //
 // The frame is a byte-for-byte port of CommandBuilder.setDeviceName in the Laufbursche
 // Edition app: AA 1F, then 16 ASCII name bytes, then one 0xFF, then CRC-8.
@@ -25,6 +26,10 @@ for (const base of ['fc', 'fd', 'fe', 'ff']) {
   }
 }
 const OPTIONAL_SERVICES = [ISSC_SERVICE, NORDIC_SERVICE].concat(VENDOR_16BIT);
+
+// The advertised name is the identity: TDE... is the limited one, T1DE... an
+// identity whose first three characters no longer read TDE.
+const NAME_PREFIXES = ['TDE', 'T1DE'];
 
 const CONNECT_CODE_INTERVAL_MS = 6500;   // the app's keep-alive spacing
 const WRITE_GAP_MS = 200;                // the app's spacing between two frames
@@ -139,9 +144,11 @@ async function pickAndConnect() {
   }
   try {
     setStatus('linking', 'waehlen ...');
-    // Every device, no filter: the tool must not care which model this is.
+    // The chooser is narrowed to a scooter identity, TDE... or T1DE..., so the list
+    // stays readable. Nothing beyond the name is checked: the write itself never
+    // asks which model this is.
     device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
+      filters: NAME_PREFIXES.map(p => ({ namePrefix: p })),
       optionalServices: OPTIONAL_SERVICES,
     });
   } catch (e) {
