@@ -3,7 +3,7 @@
 // its name.
 //
 // Nothing here looks at the model. The chooser lists devices whose name starts with
-// TDE or T1DE, and the write goes to whatever accepted the link, which is the point
+// TDE or T1DE and the write goes to whatever accepted the link, which is the point
 // of this tool.
 //
 // The frame is a byte-for-byte port of CommandBuilder.setDeviceName in the Laufbursche
@@ -27,9 +27,10 @@ for (const base of ['fc', 'fd', 'fe', 'ff']) {
 }
 const OPTIONAL_SERVICES = [ISSC_SERVICE, NORDIC_SERVICE].concat(VENDOR_16BIT);
 
-// The advertised name is the identity: TDE... is the limited one, T1DE... an
-// identity whose first three characters no longer read TDE.
-const NAME_PREFIXES = ['TDE', 'T1DE'];
+// The advertised name is the identity: TDE... is the limited one, anything else is
+// an identity whose first three characters no longer read TDE. TEU is in the list
+// because a rider typed it and a tool that cannot see a scooter cannot fix it.
+const NAME_PREFIXES = ['TDE', 'T1DE', 'TEU'];
 
 const CONNECT_CODE_INTERVAL_MS = 6500;   // the app's keep-alive spacing
 const WRITE_GAP_MS = 200;                // the app's spacing between two frames

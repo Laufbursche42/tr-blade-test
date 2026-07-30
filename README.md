@@ -2,12 +2,12 @@
 
 A one-page test tool. It connects to a scooter over Web Bluetooth and writes the VCU identity, the string the Laufbursche app calls the FIN and the Bluetooth module advertises as its name. Nothing else.
 
-**Model-independent on purpose.** The chooser lists devices whose advertised name starts with `TDE` or `T1DE`, which is a scooter identity, and nothing beyond that name is checked. There is no model gate, so the identity write can be tried on a scooter the app does not know.
+**Model-independent on purpose.** The chooser lists devices whose advertised name starts with `TDE`, `T1DE` or `TEU`, which is a scooter identity and nothing beyond that name is checked. There is no model gate, so the identity write can be tried on a scooter the app does not know.
 
 ## What it does
 
-- connect and disconnect, with the handshake and the keep-alive the app sends. The chooser is filtered to a name starting with `TDE` or `T1DE`
-- show the advertised name, which is the identity, and remember it as the value to write back
+- connect and disconnect, with the handshake and the keep-alive the app sends. The chooser is filtered to a name starting with `TDE`, `T1DE` or `TEU`
+- show the advertised name, which is the identity and remember it as the value to write back
 - write a new identity, up to 16 ASCII characters, space-padded exactly as the firmware pads it
 - write the remembered identity back
 - print the frame that went out, so it can be checked against the firmware
@@ -36,4 +36,4 @@ Use at your own risk. See the warnings the page itself shows.
 
 ## Browser
 
-Chrome on Android or desktop, and Bluefy on iOS. Safari has no Web Bluetooth at all, so a home-screen bookmark made in Safari cannot work.
+Chrome on Android or desktop and Bluefy on iOS. Safari has no Web Bluetooth at all, so a home-screen bookmark made in Safari cannot work.

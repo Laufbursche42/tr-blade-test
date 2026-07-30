@@ -18,7 +18,7 @@
 
   <div class="card">
     <h2>Wozu das hier ist</h2>
-    <p class="hint">Verbinden und die Kennung des Scooters schreiben, nichts weiter. Die Liste zeigt Geräte, deren Name mit <b>TDE</b> oder <b>T1DE</b> beginnt. Geprüft wird nur der Name: welches Modell dahinter steckt, fragt diese Seite nicht.</p>
+    <p class="hint">Verbinden und die Kennung des Scooters schreiben, nichts weiter. Die Liste zeigt Geräte, deren Name mit <b>TDE</b>, <b>T1DE</b> oder <b>TEU</b> beginnt. Geprüft wird nur der Name: welches Modell dahinter steckt, fragt diese Seite nicht.</p>
     <p class="warn"><b>Testwerkzeug.</b> Die Kennung, in der App FIN genannt, ist der Bluetooth-Name des Scooters. Sie landet im EEPROM der Steuerung und überlebt den Neustart. Schreib dir den ursprünglichen Wert auf, bevor du ihn änderst.</p>
   </div>
 
@@ -45,7 +45,7 @@
     <p class="hint">Höchstens 16 Zeichen, nur ASCII. Das erste Zeichen muss druckbar sein, die Steuerung prüft es gegen den Bereich 0x30 bis 0x7A. Kürzere Namen füllt der Befehl mit Leerzeichen auf, so wie die Firmware selbst.</p>
     <p class="hint" id="orig-line">Beim Verbinden gemerkt: <span class="mono" id="orig-name">-</span></p>
     <hr class="sep">
-    <p class="danger"><b>Nach dem Schreiben bricht die Verbindung ab.</b> Die Steuerung gibt den neuen Namen an das Bluetooth-Modul weiter, und das startet die Werbung neu. Das ist erwartet: einmal neu verbinden, dann steht der neue Name in der Liste.</p>
+    <p class="danger"><b>Nach dem Schreiben bricht die Verbindung ab.</b> Die Steuerung gibt den neuen Namen an das Bluetooth-Modul weiter und das startet die Werbung neu. Das ist erwartet: einmal neu verbinden, dann steht der neue Name in der Liste.</p>
   </div>
 
   <div class="card">
