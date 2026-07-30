@@ -49,8 +49,8 @@
   </div>
 
   <div class="card">
-    <h2>Rahmen</h2>
-    <p class="hint">Was zuletzt hinausging, damit man es gegen die Firmware prüfen kann.</p>
+    <h2>Gesendeter Befehl</h2>
+    <p class="hint">Die 20 Bytes, die zuletzt über Bluetooth hinausgegangen sind, als Hex. Aufbau: <b>AA</b> Anfang, <b>1F</b> Befehl für die Kennung, dann 16 Namensbytes in ASCII mit Leerzeichen aufgefüllt, ein unbenutztes <b>FF</b> und am Ende die Prüfsumme CRC-8. Damit lässt sich gegen die Firmware prüfen, ob hier derselbe Befehl herausgeht wie aus der App.</p>
     <pre class="copy" id="frame">-</pre>
   </div>
 
