@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v1';
+const BUILD = 'v2';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -30,7 +30,9 @@ const OPTIONAL_SERVICES = [ISSC_SERVICE, NORDIC_SERVICE].concat(VENDOR_16BIT);
 // The advertised name is the identity: TDE... is the limited one, anything else is
 // an identity whose first three characters no longer read TDE. TEU is in the list
 // because a rider typed it and a tool that cannot see a scooter cannot fix it.
-const NAME_PREFIXES = ['TDE', 'T1DE', 'TEU'];
+// Matched against the START of the advertised name, so TDE also covers TDE1, TEU covers
+// TEU1 and T1 covers T1DE. Longer forms need no entry of their own.
+const NAME_PREFIXES = ['TDE', 'T1', 'TEU'];
 
 const CONNECT_CODE_INTERVAL_MS = 6500;   // the app's keep-alive spacing
 const WRITE_GAP_MS = 200;                // the app's spacing between two frames
