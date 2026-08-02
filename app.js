@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v4';
+const BUILD = 'v7';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -233,13 +233,12 @@ async function probeNode(node) {
 
 function renderReport() {
   const lines = [];
-  lines.push('Laufbursche Node-Abfrage  Build ' + BUILD);
-  lines.push('Geraet:     ' + ((device && device.name) || '-'));
-  lines.push('Dienst:     ' + ($('svc-name').textContent || '-'));
-  lines.push('Melden:     ' + (notifyUuid || '-'));
   const n = (device && device.name) || '';
-  lines.push('Name beginnt mit T2 (die App wuerde den ver2-Weg nehmen): ' + (n.startsWith('T2') ? 'ja' : 'nein'));
-  lines.push('Projektcode der Anfrage: ' + hex([PROBE_PROJECT_CODE]));
+  lines.push('Laufbursche Node-Abfrage  Build ' + BUILD);
+  lines.push('FIN:          ' + (n || '-'));
+  lines.push('Dienst:       ' + ($('svc-name').textContent || '-'));
+  lines.push('Melden:       ' + (notifyUuid || '-'));
+  lines.push('Projektcode:  ' + hex([PROBE_PROJECT_CODE]));
   lines.push('');
   let answered = 0;
   for (const r of probeReport) {
@@ -294,6 +293,22 @@ function stopKeepAlive() {
   if (keepAlive) { clearInterval(keepAlive); keepAlive = null; }
 }
 
+// The remembered FIN is the only thing this page keeps between visits, so the two
+// buttons that depend on it are always switched together with the line that shows it.
+function refreshOrigUi() {
+  $('orig-name').textContent = originalName || '-';
+  $('btn-restore').disabled = !originalName;
+  $('btn-forget').disabled = !originalName;
+}
+
+function forgetOriginal() {
+  originalName = null;
+  try { localStorage.removeItem(LS_ORIG); } catch (e) {}
+  refreshOrigUi();
+  log('gemerkte FIN aus dem Browser geloescht. Beim naechsten Verbinden wird der dann');
+  log('gelesene Name als der urspruengliche gemerkt.');
+}
+
 function onDisconnected() {
   stopKeepAlive();
   writeChar = null;
@@ -302,7 +317,7 @@ function onDisconnected() {
   $('btn-conn').textContent = 'Verbinden';
   $('fin-in').disabled = true;
   $('btn-set').disabled = true;
-  $('btn-restore').disabled = !originalName;
+  refreshOrigUi();
   $('svc-name').textContent = '-';
   setProbeBusy(false);
   log('Verbindung getrennt');
@@ -344,7 +359,7 @@ async function connectTo(dev) {
         originalName = dev.name;
         try { localStorage.setItem(LS_ORIG, originalName); } catch (e) {}
       }
-      $('orig-name').textContent = originalName;
+      refreshOrigUi();
       $('fin-in').value = dev.name;
     }
 
@@ -389,7 +404,7 @@ async function connectTo(dev) {
     $('fin-in').disabled = false;
     $('fin-in').placeholder = 'z. B. T1DE0000000000';
     $('btn-set').disabled = false;
-    $('btn-restore').disabled = !originalName;
+    refreshOrigUi();
     setProbeBusy(false);
 
     // Handshake first, then keep the link alive the way the app does.
@@ -411,7 +426,7 @@ function disconnect() {
 }
 
 function validate(name) {
-  if (!name) return 'Die Kennung darf nicht leer sein.';
+  if (!name) return 'Die FIN darf nicht leer sein.';
   if (name.length > 16) return 'Hoechstens 16 Zeichen.';
   for (const ch of name) {
     const c = ch.charCodeAt(0);
@@ -428,8 +443,8 @@ async function writeName(name) {
   const bad = validate(name);
   if (bad) { log('abgelehnt: ' + bad); return; }
   setStatus('writing', 'schreiben ...');
-  log('schreibe Kennung: "' + name + '"');
-  await send(setDeviceNameFrame(name), 'Kennung');
+  log('schreibe FIN: "' + name + '"');
+  await send(setDeviceNameFrame(name), 'FIN');
   log('geschrieben. Die Steuerung legt den Wert im EEPROM ab und gibt ihn an das Bluetooth-Modul weiter.');
   log('Die Verbindung bricht dabei ab. Danach einmal neu verbinden.');
   if (device && device.gatt.connected) setStatus('connected', 'verbunden');
@@ -439,12 +454,9 @@ window.addEventListener('DOMContentLoaded', () => {
   $('build-ver').textContent = 'Build ' + BUILD;
   try {
     const stored = localStorage.getItem(LS_ORIG);
-    if (stored) {
-      originalName = stored;
-      $('orig-name').textContent = stored;
-      $('btn-restore').disabled = false;
-    }
+    if (stored) originalName = stored;
   } catch (e) {}
+  refreshOrigUi();
 
   log('Blade-Test ' + BUILD);
   if (!navigator.bluetooth) log('Kein Web Bluetooth in diesem Browser. Auf iOS Bluefy nutzen.');
@@ -478,8 +490,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   $('btn-set').addEventListener('click', () => writeName($('fin-in').value.trim()));
   $('btn-restore').addEventListener('click', () => {
-    if (!originalName) { log('keine urspruengliche Kennung gemerkt'); return; }
+    if (!originalName) { log('keine urspruengliche FIN gemerkt'); return; }
     writeName(originalName);
   });
+  $('btn-forget').addEventListener('click', forgetOriginal);
   $('fin-in').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-set').click(); });
 });

@@ -14,6 +14,13 @@ A one-page test tool. It connects to a scooter over Web Bluetooth and writes the
 - write the remembered identity back
 - ask a single assembly whether it is reachable and whether it would take an update, without sending any firmware
 - print the frame that went out, so it can be checked against the firmware
+- forget the remembered identity again
+
+## What it stores
+
+Writing the original identity back has to survive a reload, so the page keeps it in `localStorage` under the key `fintest_orig_name`. It is written on the first connect and read on every load. The page says so on screen and offers a button that deletes it again. Nothing leaves the device: the page carries `connect-src 'none'` in its own content security policy, so it cannot open an outbound connection at all.
+
+The remembered value is the one from the first connect and is not replaced later. On a second scooter the restore button would therefore write the first scooter's identity. Delete the stored value before connecting a different scooter.
 
 ## The identity frame
 
@@ -77,7 +84,7 @@ The finding that matters sits one level above the individual codes: any well-for
 
 ### The report
 
-"Protokoll kopieren" produces a plain text block with the device name, the service UUID, the notify UUID, the sent and received frame per node with its reading, plus a conclusion. It also records whether the advertised name starts with `T2`, because that is the switch the vendor app itself uses to decide whether it takes this path. This page sends regardless of that flag, which is what makes the test worth running.
+"Protokoll kopieren" produces a plain text block with the FIN, the service UUID, the notify UUID, the project code that was asked with, the sent and received frame per node with its reading, plus a conclusion.
 
 ### Verification
 

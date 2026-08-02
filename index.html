@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Laufbursche Blade-Test</title>
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 <div class="wrap">
@@ -20,8 +20,8 @@
 
   <div class="card">
     <h2>Wozu das hier ist</h2>
-    <p class="hint">Verbinden und die Kennung des Scooters schreiben, nichts weiter. Die Liste zeigt Geräte, deren Name mit <b>TDE</b>, <b>T1</b> oder <b>TEU</b> beginnt. Geprüft wird der Anfang, also sind <b>TDE1</b>, <b>T1DE</b> und <b>TEU1</b> ebenfalls dabei. Welches Modell dahinter steckt, fragt diese Seite nicht.</p>
-    <p class="warn"><b>Testwerkzeug.</b> Die Kennung, in der App FIN genannt, ist der Bluetooth-Name des Scooters. Sie landet im EEPROM der Steuerung und überlebt den Neustart. Schreib dir den ursprünglichen Wert auf, bevor du ihn änderst.</p>
+    <p class="hint">Verbinden und die FIN des Scooters schreiben, nichts weiter. Die Liste zeigt Geräte, deren Name mit <b>TDE</b>, <b>T1</b> oder <b>TEU</b> beginnt. Geprüft wird der Anfang, also sind <b>TDE1</b>, <b>T1DE</b> und <b>TEU1</b> ebenfalls dabei. Welches Modell dahinter steckt, fragt diese Seite nicht.</p>
+    <p class="warn"><b>Testwerkzeug.</b> Die FIN ist der Bluetooth-Name des Scooters. Sie landet im EEPROM der Steuerung und überlebt den Neustart. Schreib dir den ursprünglichen Wert auf, bevor du ihn änderst.</p>
   </div>
 
   <div class="card">
@@ -32,22 +32,6 @@
     <div class="row"><span class="mono">Gerät: <span id="dev-name">-</span></span></div>
     <div class="row"><span class="mono">Dienst: <span id="svc-name">-</span></span></div>
     <p class="hint">Läuft in Chrome auf Android oder am Rechner und in Bluefy auf iOS. Safari hat kein Web Bluetooth.</p>
-  </div>
-
-  <div class="card">
-    <h2>Kennung schreiben</h2>
-    <div class="row">
-      <label class="full" for="fin-in">Neue Kennung</label>
-      <input id="fin-in" type="text" maxlength="16" spellcheck="false" autocapitalize="characters" placeholder="erst verbinden" disabled>
-      <button id="btn-set" disabled>Schreiben</button>
-    </div>
-    <div class="row">
-      <button id="btn-restore" disabled>Ursprüngliche Kennung zurückschreiben</button>
-    </div>
-    <p class="hint">Höchstens 16 Zeichen, nur ASCII. Das erste Zeichen muss druckbar sein, die Steuerung prüft es gegen den Bereich 0x30 bis 0x7A. Kürzere Namen füllt der Befehl mit Leerzeichen auf, so wie die Firmware selbst.</p>
-    <p class="hint" id="orig-line">Beim Verbinden gemerkt: <span class="mono" id="orig-name">-</span></p>
-    <hr class="sep">
-    <p class="danger"><b>Nach dem Schreiben bricht die Verbindung ab.</b> Die Steuerung gibt den neuen Namen an das Bluetooth-Modul weiter und das startet die Werbung neu. Das ist erwartet: einmal neu verbinden, dann steht der neue Name in der Liste.</p>
   </div>
 
   <div class="card">
@@ -70,8 +54,28 @@
   </div>
 
   <div class="card">
+    <h2>FIN schreiben</h2>
+    <div class="row">
+      <label class="full" for="fin-in">Neue FIN</label>
+      <input id="fin-in" type="text" maxlength="16" spellcheck="false" autocapitalize="characters" placeholder="erst verbinden" disabled>
+      <button id="btn-set" disabled>Schreiben</button>
+    </div>
+    <div class="row">
+      <button id="btn-restore" disabled>Ursprüngliche FIN zurückschreiben</button>
+    </div>
+    <p class="hint">Höchstens 16 Zeichen, nur ASCII. Das erste Zeichen muss druckbar sein, die Steuerung prüft es gegen den Bereich 0x30 bis 0x7A. Kürzere Namen füllt der Befehl mit Leerzeichen auf, so wie die Firmware selbst.</p>
+    <p class="hint" id="orig-line">Beim Verbinden gemerkt: <span class="mono" id="orig-name">-</span></p>
+    <p class="warn"><b>Diese Seite speichert deine FIN im Browser.</b> Damit „Ursprüngliche FIN zurückschreiben" auch nach einem Neuladen noch weiß, worauf es zurücksetzen soll, legt die Seite den beim ersten Verbinden gelesenen Namen im lokalen Speicher deines Browsers ab, unter dem Schlüssel <span class="mono">fintest_orig_name</span>. Der Wert bleibt dort, bis du ihn unten löschst oder die Websitedaten entfernst. Er verlässt dein Gerät nicht: diese Seite darf laut ihrer eigenen Sicherheitsregel überhaupt keine Verbindung nach außen aufbauen.</p>
+    <div class="row">
+      <button id="btn-forget" disabled>Gemerkte FIN aus dem Browser löschen</button>
+    </div>
+    <hr class="sep">
+    <p class="danger"><b>Nach dem Schreiben bricht die Verbindung ab.</b> Die Steuerung gibt den neuen Namen an das Bluetooth-Modul weiter und das startet die Werbung neu. Das ist erwartet: einmal neu verbinden, dann steht der neue Name in der Liste.</p>
+  </div>
+
+  <div class="card">
     <h2>Gesendeter Befehl</h2>
-    <p class="hint">Die 20 Bytes, die zuletzt über Bluetooth hinausgegangen sind, als Hex. Aufbau: <b>AA</b> Anfang, <b>1F</b> Befehl für die Kennung, dann 16 Namensbytes in ASCII mit Leerzeichen aufgefüllt, ein unbenutztes <b>FF</b> und am Ende die Prüfsumme CRC-8. Damit lässt sich gegen die Firmware prüfen, ob hier derselbe Befehl herausgeht wie aus der App.</p>
+    <p class="hint">Die 20 Bytes, die zuletzt über Bluetooth hinausgegangen sind, als Hex. Aufbau: <b>AA</b> Anfang, <b>1F</b> Befehl für die FIN, dann 16 Namensbytes in ASCII mit Leerzeichen aufgefüllt, ein unbenutztes <b>FF</b> und am Ende die Prüfsumme CRC-8. Damit lässt sich gegen die Firmware prüfen, ob hier derselbe Befehl herausgeht wie aus der App.</p>
     <pre class="copy" id="frame">-</pre>
   </div>
 
@@ -88,6 +92,6 @@
   </footer>
 </div>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
