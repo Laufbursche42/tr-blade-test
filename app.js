@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v10';
+const BUILD = 'v11';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -178,7 +178,9 @@ const DECODERS = {
               ['Strom', (0.1 * u16(v, 6) - 1000).toFixed(1) + ' A'],
               ['Ladestand', v[8] + ' %'],
               ['Gesundheit', v[9] + ' %'],
-              ['Temperaturen', (v[10] - 40) + ' / ' + (v[17] - 40) + ' / ' + (v[18] - 40) + ' C']],
+              // The app reads seven sensors out of 10 to 16, plus two more at 17 and 18.
+              ['Temperaturen', [10, 11, 12, 13, 14, 15, 16, 17, 18]
+                .map(i => v[i] - 40).join(' ') + ' C']],
   0x71: v => [['Gang', String(v[3])],
               ['Radgroesse', (0.1 * v[6]).toFixed(1) + ' Zoll'],
               ['Speed-Limit', String(v[11])],
@@ -200,18 +202,59 @@ const DECODERS = {
   0x44: invFields(0x44),
   0x45: invFields(0x45),
   0x4D: invFields(0x4D),
+  // The BMS frames live in the app's battery page, not its home page.
+  0x51: v => [['Zellen 1 bis 8', cells(v)]],
+  0x55: v => [['Zellen 9 bis 16', cells(v)]],
+  0x56: v => [['Zellen 17 bis 24', cells(v)]],
+  0x53: v => [['Relais', v[2] + ' ' + v[3] + ' ' + v[4]],
+              ['Lade-MOSFET', v[5] === 2 ? 'an' : 'aus (' + v[5] + ')'],
+              ['Entlade-MOSFET', v[6] === 2 ? 'an' : 'aus (' + v[6] + ')'],
+              ['Balancer', bits(v[7]).join('')],
+              ['Kapazitaet', u16(v, 8) + ' Ah'],
+              ['Kapazitaet ver2', u16(v, 10) + ' Ah'],
+              ['Ladezyklen', String(u16(v, 12))],
+              ['Zellenzahl', String(v[14])],
+              ['Zelle hoechste', u16(v, 15) + ' mV'],
+              ['Zelle niedrigste', u16(v, 17) + ' mV']],
+  0x54: v => {
+    const on = [];
+    for (let i = 2; i <= 18; i++) if (v[i] > 0) on.push('Feld ' + (i - 2) + ' = ' + v[i]);
+    return [['Warnungen', on.length ? on.join(', ') : 'keine']];
+  },
 };
 
+function cells(v) {
+  const out = [];
+  for (let i = 2; i <= 16; i += 2) out.push(u16(v, i));
+  return out.join(' ') + ' mV';
+}
+
+const INV_MAX_VARIANTS = 6;
+
 let inv = {};
-let invSeen = {};   // which 55 subtypes arrived and how often
-let invLast = {};   // the last raw frame per subtype
+let invSeen = {};       // which 55 subtypes arrived and how often
+let invVariants = {};   // sub -> { hexString: count }, because a subtype is not one frame
+let invDropped = {};    // sub -> variants beyond the cap, so nothing vanishes unannounced
 
 function resetInventory() {
   inv = { frameNo: null, batCode: null, mainSw: null, mainHw: null, parts: {} };
   invSeen = {};
-  invLast = {};
+  invVariants = {};
+  invDropped = {};
 }
 resetInventory();
+
+// A subtype can carry different content from one send to the next. Keeping only the
+// last one hides exactly that, so every distinct byte pattern is counted separately.
+function noteVariant(sub, v) {
+  const key = hex(v);
+  const m = invVariants[sub] || (invVariants[sub] = {});
+  if (m[key] === undefined && Object.keys(m).length >= INV_MAX_VARIANTS) {
+    invDropped[sub] = (invDropped[sub] || 0) + 1;
+    return;
+  }
+  m[key] = (m[key] || 0) + 1;
+}
 
 function invAscii(v, from, len) {
   let s = '';
@@ -234,7 +277,7 @@ function onInfoFrame(v) {
   if (crc8(v, v.length - 1) !== v[v.length - 1]) return;   // the app checks this first
   const sub = v[1];
   invSeen[sub] = (invSeen[sub] || 0) + 1;
-  invLast[sub] = Array.from(v);
+  noteVariant(sub, v);
 
   if (sub === 0x41) {
     const c = invAscii(v, 2, 15);
@@ -284,17 +327,23 @@ function renderInventory() {
     lines.push('Gesehene 55-Rahmen: ' + subs.map(s =>
       hex([s]) + ' x' + invSeen[s]).join(', '));
     lines.push('');
-    lines.push('Rahmen im Einzelnen, jeweils der zuletzt empfangene');
+    lines.push('Rahmen im Einzelnen, jede abweichende Ausprägung eigen');
     for (const s of subs) {
+      const variants = Object.keys(invVariants[s] || {});
       lines.push('');
-      lines.push('55 ' + hex([s]) + '   ' + invSeen[s] + ' mal');
-      lines.push('  roh:  ' + hex(invLast[s]));
+      lines.push('55 ' + hex([s]) + '   ' + invSeen[s] + ' mal, '
+                 + variants.length + (variants.length === 1 ? ' Ausprägung' : ' Ausprägungen')
+                 + (invDropped[s] ? ', ' + invDropped[s] + ' weitere nicht behalten' : ''));
       const dec = DECODERS[s];
-      if (!dec) { lines.push('  Diesen Rahmen liest die App nicht aus.'); continue; }
-      let fields;
-      try { fields = dec(invLast[s]); } catch (e) { fields = null; }
-      if (!fields) { lines.push('  Auswertung fehlgeschlagen.'); continue; }
-      for (const f of fields) lines.push('  ' + pad(f[0] + ':') + f[1]);
+      for (const raw of variants) {
+        lines.push('  roh:  ' + raw + '   (' + invVariants[s][raw] + 'x)');
+        if (!dec) { lines.push('        Diesen Rahmen liest die App nicht aus.'); continue; }
+        const bytes = raw.split(' ').map(h => parseInt(h, 16));
+        let fields;
+        try { fields = dec(bytes); } catch (e) { fields = null; }
+        if (!fields) { lines.push('        Auswertung fehlgeschlagen.'); continue; }
+        for (const f of fields) lines.push('        ' + pad(f[0] + ':') + f[1]);
+      }
     }
   }
   $('inv-out').textContent = lines.join('\n');
