@@ -64,11 +64,13 @@ button:active { transform: translateY(1px); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #0A0C10; }
 button:disabled, input:disabled { opacity: .45; cursor: not-allowed; }
 
-input {
+input, select {
   background: #0d1018; color: var(--text); border: 1px solid var(--line); border-radius: 10px;
   padding: 10px 12px; font-size: 15px; font-family: var(--mono); min-width: 0; flex: 1 1 120px;
   text-transform: none;
 }
+select { appearance: none; cursor: pointer; }
+select:disabled { opacity: .45; cursor: not-allowed; }
 label { color: var(--label); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 
 .hint { color: var(--muted); font-size: 12px; margin: 0; }
@@ -90,6 +92,12 @@ label { color: var(--label); font-size: 12px; text-transform: uppercase; letter-
   margin: 0; font-family: var(--mono); font-size: 11.5px; background: #0d1018;
   border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; color: var(--value);
   white-space: pre-wrap; word-break: break-all; -webkit-user-select: all; user-select: all;
+}
+/* The node report is a small aligned table: it must not break inside a hex line and it
+   scrolls on its own instead of stretching the card. */
+#probe-out {
+  white-space: pre; word-break: normal; overflow: auto; max-height: 280px;
+  color: var(--label); -webkit-user-select: text; user-select: text;
 }
 pre#log {
   margin: 0; background: #0d1018; border: 1px solid var(--line); border-radius: 8px; padding: 10px;

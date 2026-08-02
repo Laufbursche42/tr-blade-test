@@ -6,13 +6,13 @@
      HTTP header, and GitHub Pages sends no custom headers. It would only log a warning. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Laufbursche FIN-Test</title>
-<link rel="stylesheet" href="styles.css?v=3">
+<title>Laufbursche Blade-Test</title>
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Laufbursche <span>FIN-Test</span></h1>
+    <h1>Laufbursche <span>Blade-Test</span></h1>
     <div class="head-right">
       <span class="status" id="status" data-state="disconnected">getrennt</span>
     </div>
@@ -51,6 +51,25 @@
   </div>
 
   <div class="card">
+    <h2>Node-Abfrage</h2>
+    <p class="hint">Fragt eine Baugruppe, ob sie hinter dieser Bluetooth-Verbindung erreichbar ist und ob sie ein Update annehmen könnte. Es wird <b>nur gefragt</b>. Der Befehl, der ein Update tatsächlich beginnt, ist ein anderer und steht in dieser Seite nirgends.</p>
+    <div class="row">
+      <label class="full" for="probe-node">Baugruppe</label>
+      <select id="probe-node" disabled></select>
+      <button id="btn-probe" disabled>Abfragen</button>
+    </div>
+    <div class="row">
+      <button id="btn-probe-all" disabled>Alle nacheinander abfragen</button>
+    </div>
+    <p class="warn"><b>Wonach wir suchen.</b> Schon <i>irgendeine</i> gültige Antwort beweist, dass die Gegenstelle hinter Bluetooth dieses Update-Protokoll überhaupt spricht. Ein „Projektcode passt nicht" beweist zusätzlich, dass die genannte Baugruppe erreichbar ist und geflasht werden könnte. Bleibt alles still, gibt es diesen Weg auf diesem Gerät nicht.</p>
+    <p class="hint">Die Anfrage nennt absichtlich einen Projektcode, den keine Baugruppe haben kann. Damit ist die freundlichste mögliche Antwort „Code passt nicht", und ein versehentliches Ja kann es nicht geben.</p>
+    <pre class="copy" id="probe-out">-</pre>
+    <div class="row">
+      <button id="btn-probe-copy" disabled>Protokoll kopieren</button>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>Gesendeter Befehl</h2>
     <p class="hint">Die 20 Bytes, die zuletzt über Bluetooth hinausgegangen sind, als Hex. Aufbau: <b>AA</b> Anfang, <b>1F</b> Befehl für die Kennung, dann 16 Namensbytes in ASCII mit Leerzeichen aufgefüllt, ein unbenutztes <b>FF</b> und am Ende die Prüfsumme CRC-8. Damit lässt sich gegen die Firmware prüfen, ob hier derselbe Befehl herausgeht wie aus der App.</p>
     <pre class="copy" id="frame">-</pre>
@@ -69,6 +88,6 @@
   </footer>
 </div>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
