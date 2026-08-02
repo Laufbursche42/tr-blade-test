@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v12';
+const BUILD = 'v13';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -27,7 +27,11 @@ for (const base of ['fc', 'fd', 'fe', 'ff']) {
     VENDOR_16BIT.push('0000' + base + i.toString(16).padStart(2, '0') + '-0000-1000-8000-00805f9b34fb');
   }
 }
-const OPTIONAL_SERVICES = [ISSC_SERVICE, NORDIC_SERVICE].concat(VENDOR_16BIT);
+// The standard device information service. A module that fills it names itself.
+const DIS_SERVICE = '0000180a-0000-1000-8000-00805f9b34fb';
+const BATTERY_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb';
+const OPTIONAL_SERVICES = [ISSC_SERVICE, NORDIC_SERVICE, DIS_SERVICE, BATTERY_SERVICE]
+  .concat(VENDOR_16BIT);
 
 // The advertised name is the identity: TDE... is the limited one, anything else is
 // an identity whose first three characters no longer read TDE. TEU is in the list
@@ -139,6 +143,88 @@ function send(bytes, what) {
     await new Promise(r => setTimeout(r, WRITE_GAP_MS));
   }).catch(e => { log('Schreiben fehlgeschlagen: ' + (e && e.message ? e.message : e)); });
   return busy;
+}
+
+// ── Device profile ───────────────────────────────────────────────────────────
+// Every service and characteristic the module offers, plus the contents of the
+// standard device information service. Reading is limited to that one service:
+// a read on an unknown vendor characteristic can have side effects, a read on
+// 180A cannot, it exists to be read.
+
+const DIS_NAMES = {
+  '2a23': 'System-Kennung',
+  '2a24': 'Modellnummer',
+  '2a25': 'Seriennummer',
+  '2a26': 'Firmware-Stand',
+  '2a27': 'Hardware-Stand',
+  '2a28': 'Software-Stand',
+  '2a29': 'Hersteller',
+  '2a2a': 'Zulassungsdaten',
+  '2a50': 'PnP-Kennung',
+};
+
+const short = uuid => (uuid.startsWith('0000') && uuid.endsWith('-0000-1000-8000-00805f9b34fb'))
+  ? uuid.slice(4, 8) : uuid;
+
+function charProps(c) {
+  const p = c.properties, out = [];
+  if (p.read) out.push('lesen');
+  if (p.write) out.push('schreiben');
+  if (p.writeWithoutResponse) out.push('schreiben ohne Antwort');
+  if (p.notify) out.push('melden');
+  if (p.indicate) out.push('anzeigen');
+  if (p.broadcast) out.push('rundsenden');
+  if (p.authenticatedSignedWrites) out.push('signiert schreiben');
+  return out.length ? out.join(', ') : 'keine';
+}
+
+function dvText(dv) {
+  let s = '';
+  for (let i = 0; i < dv.byteLength; i++) {
+    const c = dv.getUint8(i);
+    if (c >= 0x20 && c <= 0x7E) s += String.fromCharCode(c);
+  }
+  return s.trim();
+}
+
+// Vendor and product straight out of the module, if it fills this one in.
+function pnpText(dv) {
+  if (dv.byteLength < 7) return null;
+  const src = dv.getUint8(0);
+  return 'Quelle ' + (src === 1 ? 'Bluetooth SIG' : src === 2 ? 'USB-IF' : src)
+       + ', Hersteller 0x' + dv.getUint16(1, true).toString(16).padStart(4, '0')
+       + ', Produkt 0x' + dv.getUint16(3, true).toString(16).padStart(4, '0')
+       + ', Fassung 0x' + dv.getUint16(5, true).toString(16).padStart(4, '0');
+}
+
+async function buildProfile(services) {
+  const lines = [];
+  lines.push('Laufbursche Geraetesteckbrief  Build ' + BUILD);
+  lines.push('FIN:      ' + ((device && device.name) || '-'));
+  lines.push('Dienste:  ' + services.length);
+  for (const svc of services) {
+    lines.push('');
+    lines.push('Dienst ' + short(svc.uuid));
+    let chars;
+    try { chars = await svc.getCharacteristics(); } catch (e) { chars = []; }
+    if (!chars.length) { lines.push('  keine Charakteristiken lesbar'); continue; }
+    for (const c of chars) {
+      lines.push('  ' + short(c.uuid) + '   ' + charProps(c));
+      if (svc.uuid !== DIS_SERVICE || !c.properties.read) continue;
+      const key = short(c.uuid);
+      let val;
+      try {
+        const dv = await c.readValue();
+        val = (key === '2a50' ? pnpText(dv) : null) || dvText(dv) || hex(new Uint8Array(dv.buffer));
+      } catch (e) {
+        // Web Bluetooth refuses the serial number by design, that is not a fault.
+        val = '(nicht lesbar: ' + (e && e.name ? e.name : e) + ')';
+      }
+      lines.push('      ' + (DIS_NAMES[key] || key) + ': ' + val);
+    }
+  }
+  $('prof-out').textContent = lines.join('\n');
+  $('btn-prof-copy').disabled = false;
 }
 
 // ── Inventory ────────────────────────────────────────────────────────────────
@@ -676,6 +762,8 @@ async function connectTo(dev) {
     }
     if (!notifyUuids.length) log('Kein Meldekanal. Eine Node-Abfrage kann so nichts hoeren.');
 
+    buildProfile(services).catch(e => log('Steckbrief unvollstaendig: ' + (e && e.message ? e.message : e)));
+
     setStatus('connected', 'verbunden');
     $('btn-conn').textContent = 'Trennen';
     $('fin-in').disabled = false;
@@ -772,6 +860,14 @@ window.addEventListener('DOMContentLoaded', () => {
     writeName(originalName);
   });
   $('btn-forget').addEventListener('click', forgetOriginal);
+  $('btn-prof-copy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($('prof-out').textContent);
+      log('Steckbrief in die Zwischenablage gelegt');
+    } catch (e) {
+      log('Kopieren ging nicht, den Text bitte von Hand markieren');
+    }
+  });
   $('btn-inv-copy').addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText($('inv-out').textContent);

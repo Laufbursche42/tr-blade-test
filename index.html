@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Laufbursche Blade-Test</title>
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
 <div class="wrap">
@@ -32,6 +32,16 @@
     <div class="row"><span class="mono">Gerät: <span id="dev-name">-</span></span></div>
     <div class="row"><span class="mono">Dienst: <span id="svc-name">-</span></span></div>
     <p class="hint">Läuft in Chrome auf Android oder am Rechner und in Bluefy auf iOS. Safari hat kein Web Bluetooth.</p>
+  </div>
+
+  <div class="card">
+    <h2>Gerätesteckbrief</h2>
+    <p class="hint">Was das Bluetooth-Modul selbst über sich verrät: alle angebotenen Dienste, alle Charakteristiken mit ihren Fähigkeiten, dazu der genormte Geräteinformations-Dienst <span class="mono">180A</span> im Klartext, also Hersteller, Modell und Stände. Füllt sich beim Verbinden von selbst.</p>
+    <pre class="copy" id="prof-out">-</pre>
+    <p class="hint">Gelesen wird ausschließlich aus <span class="mono">180A</span>, denn dieser Dienst ist genau dafür da. Von unbekannten Hersteller-Charakteristiken wird nichts gelesen, weil ein Lesezugriff dort etwas auslösen könnte. Die Seriennummer sperrt der Browser von sich aus, das ist kein Fehler.</p>
+    <div class="row">
+      <button id="btn-prof-copy" disabled>Steckbrief kopieren</button>
+    </div>
   </div>
 
   <div class="card">
@@ -102,6 +112,6 @@
   </footer>
 </div>
 
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
