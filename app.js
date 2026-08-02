@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v9';
+const BUILD = 'v10';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -155,12 +155,61 @@ const INVENTORY = {
   ],
 };
 
+// Field readings for the frames the app decodes. Everything else still shows up raw,
+// so an unknown frame is visible instead of silently dropped.
+const u16 = (v, i) => (v[i] << 8) | v[i + 1];
+const bits = b => b.toString(2).padStart(8, '0').split('').reverse();   // the app's order
+
+// The identity frames read their fields straight out of INVENTORY, so the raw view and
+// the summary above can never drift apart.
+function invFields(sub) {
+  return v => INVENTORY[sub].map(f => [f.label,
+    'Typ ' + v[f.type] + '  Code ' + v[f.code]
+    + '  Version ' + (invVersion(v, f.ver, f.test) || 'nicht gemeldet')]);
+}
+
+const DECODERS = {
+  0x41: v => [['Akku-Kennung als Text', invAscii(v, 2, 15) || '(nichts Druckbares)']],
+  0x42: v => [['Rahmennummer als Text', invAscii(v, 2, 17) || '(nichts Druckbares)']],
+  0x43: v => [['Software', v[2] + '.' + v[3] + '.' + v[4]],
+              ['Hardware', v[6] + '.' + v[7] + '.' + v[8]]],
+  0x52: v => [['Pack-Spannung', (0.1 * u16(v, 2)).toFixed(1) + ' V'],
+              ['Zellspannung', (0.1 * u16(v, 4)).toFixed(1) + ' V'],
+              ['Strom', (0.1 * u16(v, 6) - 1000).toFixed(1) + ' A'],
+              ['Ladestand', v[8] + ' %'],
+              ['Gesundheit', v[9] + ' %'],
+              ['Temperaturen', (v[10] - 40) + ' / ' + (v[17] - 40) + ' / ' + (v[18] - 40) + ' C']],
+  0x71: v => [['Gang', String(v[3])],
+              ['Radgroesse', (0.1 * v[6]).toFixed(1) + ' Zoll'],
+              ['Speed-Limit', String(v[11])],
+              ['Polpaare', String(v[5])],
+              ['Pack-Spannung', String(v[15])],
+              ['Temperatur', String(v[7])],
+              ['Tempomat', String(parseInt(bits(v[4])[2] + bits(v[4])[1], 2))],
+              ['ABS', bits(v[4])[3]],
+              ['Anfahrmodus', bits(v[4])[6]],
+              ['Smart', bits(v[17])[4]],
+              ['Meilen', bits(v[17])[1]]],
+  0x72: v => [['Strom hinten', (0.1 * u16(v, 12)).toFixed(1) + ' A'],
+              ['Strom vorn', (0.1 * u16(v, 4)).toFixed(1) + ' A'],
+              ['Motortemperatur hinten', String(v[17])],
+              ['Motortemperatur vorn', String(v[9])]],
+  0x73: v => [['Schnitt', (0.1 * u16(v, 2)).toFixed(1) + ' km/h'],
+              ['Maximum', (0.1 * u16(v, 4)).toFixed(1) + ' km/h'],
+              ['Strecke', (0.1 * u16(v, 6)).toFixed(1) + ' km']],
+  0x44: invFields(0x44),
+  0x45: invFields(0x45),
+  0x4D: invFields(0x4D),
+};
+
 let inv = {};
 let invSeen = {};   // which 55 subtypes arrived and how often
+let invLast = {};   // the last raw frame per subtype
 
 function resetInventory() {
   inv = { frameNo: null, batCode: null, mainSw: null, mainHw: null, parts: {} };
   invSeen = {};
+  invLast = {};
 }
 resetInventory();
 
@@ -185,6 +234,7 @@ function onInfoFrame(v) {
   if (crc8(v, v.length - 1) !== v[v.length - 1]) return;   // the app checks this first
   const sub = v[1];
   invSeen[sub] = (invSeen[sub] || 0) + 1;
+  invLast[sub] = Array.from(v);
 
   if (sub === 0x41) {
     const c = invAscii(v, 2, 15);
@@ -204,15 +254,14 @@ function onInfoFrame(v) {
         ver: invVersion(v, f.ver, f.test),
       };
     }
-  } else {
-    return;   // a 55 frame we do not read, counted above and otherwise ignored
   }
-  renderInventory();
+  renderInventory();   // an unknown subtype still made it into the counter and the raw view
 }
 
 function renderInventory() {
   const lines = [];
-  const pad = s => (s + '                      ').slice(0, 20);
+  // Widen to a column but never cut a label short, a truncated name is unreadable.
+  const pad = s => s.length >= 22 ? s + ' ' : (s + '                      ').slice(0, 22);
   lines.push(pad('Rahmennummer:') + (inv.frameNo || '-'));
   lines.push(pad('Akku-Kennung:') + (inv.batCode || '-'));
   lines.push(pad('Hauptgeraet:') + 'Software ' + (inv.mainSw || '-')
@@ -234,6 +283,19 @@ function renderInventory() {
     lines.push('');
     lines.push('Gesehene 55-Rahmen: ' + subs.map(s =>
       hex([s]) + ' x' + invSeen[s]).join(', '));
+    lines.push('');
+    lines.push('Rahmen im Einzelnen, jeweils der zuletzt empfangene');
+    for (const s of subs) {
+      lines.push('');
+      lines.push('55 ' + hex([s]) + '   ' + invSeen[s] + ' mal');
+      lines.push('  roh:  ' + hex(invLast[s]));
+      const dec = DECODERS[s];
+      if (!dec) { lines.push('  Diesen Rahmen liest die App nicht aus.'); continue; }
+      let fields;
+      try { fields = dec(invLast[s]); } catch (e) { fields = null; }
+      if (!fields) { lines.push('  Auswertung fehlgeschlagen.'); continue; }
+      for (const f of fields) lines.push('  ' + pad(f[0] + ':') + f[1]);
+    }
   }
   $('inv-out').textContent = lines.join('\n');
   $('btn-inv-copy').disabled = !subs.length;
