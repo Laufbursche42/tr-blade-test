@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v11';
+const BUILD = 'v12';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -116,6 +116,17 @@ function hex(bytes) {
   return Array.from(bytes).map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 }
 
+// One notification can carry several 20-byte frames back to back. The app cuts them
+// apart the same way (app-service.js:11097). The checksum cannot catch a missed split:
+// CRC-8 over a valid frame including its own check byte is zero, so any run of valid
+// frames validates as one oversized frame.
+function splitFrames(v) {
+  if (v.length <= 20) return [v];
+  const out = [];
+  for (let i = 0; i < v.length; i += 20) out.push(v.subarray(i, i + 20));
+  return out;
+}
+
 // Web Bluetooth rejects a write while another is in flight, so every write queues.
 function send(bytes, what) {
   busy = busy.then(async () => {
@@ -172,7 +183,11 @@ const DECODERS = {
   0x41: v => [['Akku-Kennung als Text', invAscii(v, 2, 15) || '(nichts Druckbares)']],
   0x42: v => [['Rahmennummer als Text', invAscii(v, 2, 17) || '(nichts Druckbares)']],
   0x43: v => [['Software', v[2] + '.' + v[3] + '.' + v[4]],
-              ['Hardware', v[6] + '.' + v[7] + '.' + v[8]]],
+              ['Hardware', v[6] + '.' + v[7] + '.' + v[8]],
+              // The app logs byte 17 as "gearMode" and splits its two nibbles into a
+              // gear range, but only applies that on ECU devices (app-service.js:37926).
+              ['Byte 16 bis 18', hex([v[16], v[17], v[18]])],
+              ['Gangbereich aus Byte 17', (v[17] & 15) + ' bis ' + ((v[17] >> 4) & 15)]],
   0x52: v => [['Pack-Spannung', (0.1 * u16(v, 2)).toFixed(1) + ' V'],
               ['Zellspannung', (0.1 * u16(v, 4)).toFixed(1) + ' V'],
               ['Strom', (0.1 * u16(v, 6) - 1000).toFixed(1) + ' A'],
@@ -229,7 +244,7 @@ function cells(v) {
   return out.join(' ') + ' mV';
 }
 
-const INV_MAX_VARIANTS = 6;
+const INV_MAX_VARIANTS = 12;
 
 let inv = {};
 let invSeen = {};       // which 55 subtypes arrived and how often
@@ -645,12 +660,13 @@ async function connectTo(dev) {
       try {
         await nc.startNotifications();
         nc.addEventListener('characteristicvaluechanged', ev => {
-          const v = new Uint8Array(ev.target.value.buffer);
-          rxCount++;
-          rxLastUuid = nc.uuid;
-          if (onProbeFrame(v, nc.uuid)) return;    // answer to a node question
-          if (v.length && v[0] === 0x55) { onInfoFrame(v); return; }
-          log('empfangen: ' + hex(v));
+          for (const v of splitFrames(new Uint8Array(ev.target.value.buffer))) {
+            rxCount++;
+            rxLastUuid = nc.uuid;
+            if (onProbeFrame(v, nc.uuid)) continue;  // answer to a node question
+            if (v.length && v[0] === 0x55) { onInfoFrame(v); continue; }
+            log('empfangen: ' + hex(v));
+          }
         });
         notifyUuids.push(nc.uuid);
         log('Benachrichtigungen an ' + nc.uuid);
