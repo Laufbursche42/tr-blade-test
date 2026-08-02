@@ -11,13 +11,15 @@
 
 'use strict';
 
-const BUILD = 'v7';
+const BUILD = 'v8';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
 // whole 0xFC00 to 0xFFFF block is declared. Web Bluetooth only lets a page touch a
 // service it named up front.
 const ISSC_SERVICE = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
+// The write characteristic the app hardcodes for this service (app-service.js:3303).
+const ISSC_WRITE = '49535343-aca3-481c-91ec-d85e28a60318';
 const NORDIC_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const VENDOR_16BIT = [];
 for (const base of ['fc', 'fd', 'fe', 'ff']) {
@@ -40,7 +42,10 @@ const LS_ORIG = 'fintest_orig_name';
 
 let device = null;
 let writeChar = null;
-let notifyUuid = null;
+let writeUuid = null;
+let notifyUuids = [];
+let rxCount = 0;        // everything heard since connect, telemetry included
+let rxLastUuid = null;  // which channel last delivered, so a silent probe is explainable
 let keepAlive = null;
 let connectCounter = 0;
 let originalName = null;
@@ -137,7 +142,8 @@ function send(bytes, what) {
 
 const HANDSHAKE_ID = [0x06, 0xE2];
 const PROBE_PROJECT_CODE = 0x00;
-const PROBE_TIMEOUT_MS = 4000;
+const PROBE_TIMEOUT_MS = 8000;
+const PROBE_RESEND_MS = 3000;   // the app's resend spacing for an unanswered handshake
 
 // key = the number the app's own picker carries, sent as that byte value.
 const NODES = [
@@ -201,32 +207,41 @@ function decodeHandshakeResp(v) {
 }
 
 // Called from the notify handler. True means the frame was ours.
-function onProbeFrame(v) {
+function onProbeFrame(v, uuid) {
   if (!probeWaiting) return false;
   const res = decodeHandshakeResp(v);
   if (!res) return false;
   const w = probeWaiting;
   probeWaiting = null;
   clearTimeout(w.timer);
-  w.resolve({ node: w.node, sent: w.sent, got: hex(v), res: res });
+  w.resolve({ node: w.node, sent: w.sent, got: hex(v), via: uuid, res: res });
   return true;
 }
 
 async function probeNode(node) {
   const frame = handshakeFrame(node.id, PROBE_PROJECT_CODE);
   const sent = hex(frame);
+  const rxBefore = rxCount;
   log('frage Node ' + node.id + ' (' + node.text + ')');
   const answer = new Promise(resolve => {
     const timer = setTimeout(() => {
       probeWaiting = null;
-      resolve({ node: node, sent: sent, got: null,
+      const heard = rxCount - rxBefore;
+      resolve({ node: node, sent: sent, got: null, via: null,
                 res: { title: 'Keine Antwort', ok: false,
-                       note: 'Die Gegenstelle hat den Rahmen nicht beantwortet.' } });
+                       note: heard
+                         ? 'Es kamen waehrenddessen ' + heard + ' andere Rahmen an, der Meldekanal '
+                           + 'lebt also. Die Gegenstelle hat den Rahmen nur nicht beantwortet.'
+                         : 'Waehrenddessen kam ueberhaupt nichts an, auch keine Telemetrie. '
+                           + 'Das Schweigen sagt hier nichts ueber den Node-Weg aus.' } });
     }, PROBE_TIMEOUT_MS);
     probeWaiting = { node: node, resolve: resolve, timer: timer, sent: sent };
   });
   await send(frame, 'Node-Anfrage');
+  // The app repeats an unanswered handshake after three seconds, so do the same once.
+  const repeat = setTimeout(() => { if (probeWaiting) send(frame, null); }, PROBE_RESEND_MS);
   const r = await answer;
+  clearTimeout(repeat);
   log('Node ' + r.node.id + ': ' + r.res.title);
   return r;
 }
@@ -237,7 +252,10 @@ function renderReport() {
   lines.push('Laufbursche Node-Abfrage  Build ' + BUILD);
   lines.push('FIN:          ' + (n || '-'));
   lines.push('Dienst:       ' + ($('svc-name').textContent || '-'));
-  lines.push('Melden:       ' + (notifyUuid || '-'));
+  lines.push('Schreiben:    ' + (writeUuid || '-'));
+  lines.push('Melden:       ' + (notifyUuids.length ? notifyUuids.join('\n              ') : '-'));
+  lines.push('Empfangen:    ' + rxCount + ' Rahmen seit dem Verbinden'
+             + (rxLastUuid ? ', zuletzt ueber ' + rxLastUuid : ''));
   lines.push('Projektcode:  ' + hex([PROBE_PROJECT_CODE]));
   lines.push('');
   let answered = 0;
@@ -247,14 +265,20 @@ function renderReport() {
     lines.push('    empfangen: ' + (r.got || '(nichts)'));
     lines.push('    Ergebnis:  ' + r.res.title);
     lines.push('               ' + r.res.note);
+    if (r.via) lines.push('    Kanal:     ' + r.via);
     if (r.got) answered++;
   }
   lines.push('');
   if (!probeReport.length) {
     lines.push('Noch nichts abgefragt.');
+  } else if (answered === 0 && rxCount === 0) {
+    lines.push('Kein Fazit moeglich. Seit dem Verbinden ist kein einziger Rahmen');
+    lines.push('hereingekommen, nicht einmal Telemetrie. Der Meldekanal ist damit');
+    lines.push('unbewiesen, und Schweigen auf die Anfragen beweist so gar nichts.');
   } else if (answered === 0) {
-    lines.push('Fazit: keine einzige Antwort. Die Gegenstelle hinter Bluetooth kennt');
-    lines.push('den Node-Weg nicht, jedenfalls nicht auf diesen Rahmen hin.');
+    lines.push('Fazit: keine einzige Antwort, obwohl ueber denselben Kanal sonst Rahmen');
+    lines.push('hereinkommen. Die Gegenstelle hinter Bluetooth kennt den Node-Weg also');
+    lines.push('nicht, jedenfalls nicht auf diesen Rahmen hin.');
   } else {
     lines.push('Fazit: ' + answered + ' von ' + probeReport.length + ' Anfragen beantwortet.');
     lines.push('Damit steht fest, dass die Gegenstelle hinter Bluetooth das Node-Protokoll');
@@ -272,7 +296,7 @@ function setProbeBusy(on) {
 
 async function runProbe(nodes) {
   if (!writeChar) { log('nicht verbunden'); return; }
-  if (!notifyUuid) {
+  if (!notifyUuids.length) {
     log('Ohne Meldekanal ist keine Abfrage moeglich, es kaeme keine Antwort an.');
     return;
   }
@@ -312,7 +336,8 @@ function forgetOriginal() {
 function onDisconnected() {
   stopKeepAlive();
   writeChar = null;
-  notifyUuid = null;
+  writeUuid = null;
+  notifyUuids = [];
   setStatus('disconnected', 'getrennt');
   $('btn-conn').textContent = 'Verbinden';
   $('fin-in').disabled = true;
@@ -348,6 +373,8 @@ async function pickAndConnect() {
 async function connectTo(dev) {
   try {
     setStatus('linking', 'verbinden ...');
+    rxCount = 0;
+    rxLastUuid = null;
     dev.removeEventListener('gattserverdisconnected', onDisconnected);
     dev.addEventListener('gattserverdisconnected', onDisconnected);
     const server = await dev.gatt.connect();
@@ -369,35 +396,47 @@ async function connectTo(dev) {
     let picked = null;
     for (const svc of services) {
       const chars = await svc.getCharacteristics();
-      const w = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
-      const n = chars.find(c => c.properties.notify);
+      // On 495353 hardware the app does not search, it hardcodes this one for writing
+      // (app-service.js:3303). Prefer it, because "first characteristic that happens to
+      // be writable" is not the same thing on every Bluetooth stack.
+      const fixed = chars.find(c => c.uuid === ISSC_WRITE
+                                 && (c.properties.write || c.properties.writeWithoutResponse));
+      const w = fixed || chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
       if (w) {
-        picked = { svc: svc, write: w, notify: n };
+        picked = { svc: svc, write: w, notify: chars.filter(c => c.properties.notify) };
         if (svc.uuid === ISSC_SERVICE) break;   // the usual one wins
       }
     }
     if (!picked) throw new Error('kein Dienst mit beschreibbarer Charakteristik');
 
     writeChar = picked.write;
+    writeUuid = picked.write.uuid;
     $('svc-name').textContent = picked.svc.uuid;
     log('Dienst ' + picked.svc.uuid);
-    log('Schreiben auf ' + picked.write.uuid);
+    log('Schreiben auf ' + writeUuid);
 
-    if (picked.notify) {
+    // Subscribe to every notify characteristic, not just the first. The app itself
+    // switches to a second one a second after connecting when nothing has arrived
+    // (app-service.js:9024), so a unit that reports on the other channel exists.
+    notifyUuids = [];
+    for (const nc of picked.notify) {
       try {
-        await picked.notify.startNotifications();
-        picked.notify.addEventListener('characteristicvaluechanged', ev => {
+        await nc.startNotifications();
+        nc.addEventListener('characteristicvaluechanged', ev => {
           const v = new Uint8Array(ev.target.value.buffer);
-          if (onProbeFrame(v)) return;             // answer to a node question
+          rxCount++;
+          rxLastUuid = nc.uuid;
+          if (onProbeFrame(v, nc.uuid)) return;    // answer to a node question
           if (v.length && v[0] === 0x55) return;   // telemetry, not interesting here
           log('empfangen: ' + hex(v));
         });
-        notifyUuid = picked.notify.uuid;
-        log('Benachrichtigungen an ' + picked.notify.uuid);
+        notifyUuids.push(nc.uuid);
+        log('Benachrichtigungen an ' + nc.uuid);
       } catch (e) {
-        log('Benachrichtigungen nicht moeglich: ' + (e && e.message ? e.message : e));
+        log('Benachrichtigungen nicht moeglich auf ' + nc.uuid + ': ' + (e && e.message ? e.message : e));
       }
     }
+    if (!notifyUuids.length) log('Kein Meldekanal. Eine Node-Abfrage kann so nichts hoeren.');
 
     setStatus('connected', 'verbunden');
     $('btn-conn').textContent = 'Trennen';
