@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v8';
+const BUILD = 'v9';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -128,6 +128,115 @@ function send(bytes, what) {
     await new Promise(r => setTimeout(r, WRITE_GAP_MS));
   }).catch(e => { log('Schreiben fehlgeschlagen: ' + (e && e.message ? e.message : e)); });
   return busy;
+}
+
+// ── Inventory ────────────────────────────────────────────────────────────────
+// Nothing is sent for this. The scooter streams 55 frames on its own and a few of
+// them carry the identity of every assembly it knows about. The app reads them at
+// app-service.js:11102 to :11229; this is the same read, nothing more.
+//
+// Four version bytes all FF means "not reported" and the app prints -.-.- for it.
+// The light module is the odd one out: the app tests three bytes there, not four,
+// so each field checks exactly what the app checks.
+
+const INVENTORY = {
+  0x44: [
+    { key: 'dis', label: 'Display',           type: 2,  code: 3,  ver: 4,  test: 4 },
+    { key: 'bat', label: 'Akku',              type: 8,  code: 9,  ver: 10, test: 4 },
+    { key: 'lc',  label: 'Lichtmodul',        type: 14, code: 15, ver: 16, test: 3 },
+  ],
+  0x45: [
+    { key: 'rm',  label: 'Controller hinten', type: 2,  code: 3,  ver: 4,  test: 4 },
+    { key: 'fm',  label: 'Controller vorn',   type: 8,  code: 9,  ver: 10, test: 4 },
+  ],
+  0x4D: [
+    { key: 'rr',  label: 'Controller hinten rechts', type: 2, code: 3, ver: 4,  test: 4 },
+    { key: 'rf',  label: 'Controller vorn rechts',   type: 8, code: 9, ver: 10, test: 4 },
+  ],
+};
+
+let inv = {};
+let invSeen = {};   // which 55 subtypes arrived and how often
+
+function resetInventory() {
+  inv = { frameNo: null, batCode: null, mainSw: null, mainHw: null, parts: {} };
+  invSeen = {};
+}
+resetInventory();
+
+function invAscii(v, from, len) {
+  let s = '';
+  for (let i = from; i < from + len && i < v.length; i++) {
+    if (v[i] >= 0x20 && v[i] <= 0x7E) s += String.fromCharCode(v[i]);
+  }
+  return s.replace(/\s+/g, '');
+}
+
+// null means the assembly reported nothing, which is what the app shows as -.-.-
+function invVersion(v, at, testLen) {
+  let allFF = true;
+  for (let i = at; i < at + testLen; i++) if (v[i] !== 0xFF) allFF = false;
+  if (allFF) return null;
+  return v[at] + '.' + v[at + 1] + '.' + v[at + 2];
+}
+
+function onInfoFrame(v) {
+  if (v.length < 2) return;
+  if (crc8(v, v.length - 1) !== v[v.length - 1]) return;   // the app checks this first
+  const sub = v[1];
+  invSeen[sub] = (invSeen[sub] || 0) + 1;
+
+  if (sub === 0x41) {
+    const c = invAscii(v, 2, 15);
+    if (c) inv.batCode = c.startsWith('AW') ? c : 'AW' + c;
+  } else if (sub === 0x42) {
+    const f = invAscii(v, 2, 17);
+    if (f) inv.frameNo = f;
+  } else if (sub === 0x43) {
+    if (v[2] > 0) inv.mainSw = v[2] + '.' + v[3] + '.' + v[4];
+    if (v[6] > 0) inv.mainHw = v[6] + '.' + v[7] + '.' + v[8];
+  } else if (INVENTORY[sub]) {
+    for (const f of INVENTORY[sub]) {
+      inv.parts[f.key] = {
+        label: f.label,
+        type: v[f.type],
+        code: v[f.code],
+        ver: invVersion(v, f.ver, f.test),
+      };
+    }
+  } else {
+    return;   // a 55 frame we do not read, counted above and otherwise ignored
+  }
+  renderInventory();
+}
+
+function renderInventory() {
+  const lines = [];
+  const pad = s => (s + '                      ').slice(0, 20);
+  lines.push(pad('Rahmennummer:') + (inv.frameNo || '-'));
+  lines.push(pad('Akku-Kennung:') + (inv.batCode || '-'));
+  lines.push(pad('Hauptgeraet:') + 'Software ' + (inv.mainSw || '-')
+             + '   Hardware ' + (inv.mainHw || '-'));
+  lines.push('');
+  const order = ['dis', 'bat', 'lc', 'rm', 'fm', 'rr', 'rf'];
+  let any = false;
+  for (const k of order) {
+    const p = inv.parts[k];
+    if (!p) continue;
+    any = true;
+    lines.push(pad(p.label + ':') + (p.ver
+      ? 'Typ ' + p.type + '  Code ' + p.code + '  Version ' + p.ver
+      : 'nicht gemeldet'));
+  }
+  if (!any) lines.push('Noch keine Baugruppen gemeldet.');
+  const subs = Object.keys(invSeen).map(Number).sort((a, b) => a - b);
+  if (subs.length) {
+    lines.push('');
+    lines.push('Gesehene 55-Rahmen: ' + subs.map(s =>
+      hex([s]) + ' x' + invSeen[s]).join(', '));
+  }
+  $('inv-out').textContent = lines.join('\n');
+  $('btn-inv-copy').disabled = !subs.length;
 }
 
 // ── Node probe ───────────────────────────────────────────────────────────────
@@ -375,6 +484,8 @@ async function connectTo(dev) {
     setStatus('linking', 'verbinden ...');
     rxCount = 0;
     rxLastUuid = null;
+    resetInventory();
+    renderInventory();
     dev.removeEventListener('gattserverdisconnected', onDisconnected);
     dev.addEventListener('gattserverdisconnected', onDisconnected);
     const server = await dev.gatt.connect();
@@ -427,7 +538,7 @@ async function connectTo(dev) {
           rxCount++;
           rxLastUuid = nc.uuid;
           if (onProbeFrame(v, nc.uuid)) return;    // answer to a node question
-          if (v.length && v[0] === 0x55) return;   // telemetry, not interesting here
+          if (v.length && v[0] === 0x55) { onInfoFrame(v); return; }
           log('empfangen: ' + hex(v));
         });
         notifyUuids.push(nc.uuid);
@@ -511,6 +622,7 @@ window.addEventListener('DOMContentLoaded', () => {
     sel.appendChild(o);
   }
   renderReport();
+  renderInventory();
 
   $('btn-probe').addEventListener('click', () => {
     const id = parseInt(sel.value, 10);
@@ -533,5 +645,13 @@ window.addEventListener('DOMContentLoaded', () => {
     writeName(originalName);
   });
   $('btn-forget').addEventListener('click', forgetOriginal);
+  $('btn-inv-copy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($('inv-out').textContent);
+      log('Inventar in die Zwischenablage gelegt');
+    } catch (e) {
+      log('Kopieren ging nicht, den Text bitte von Hand markieren');
+    }
+  });
   $('fin-in').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-set').click(); });
 });

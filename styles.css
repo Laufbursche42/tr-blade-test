@@ -95,7 +95,7 @@ label { color: var(--label); font-size: 12px; text-transform: uppercase; letter-
 }
 /* The node report is a small aligned table: it must not break inside a hex line and it
    scrolls on its own instead of stretching the card. */
-#probe-out {
+#probe-out, #inv-out {
   white-space: pre; word-break: normal; overflow: auto; max-height: 280px;
   color: var(--label); -webkit-user-select: text; user-select: text;
 }

@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Laufbursche Blade-Test</title>
-<link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
 <div class="wrap">
@@ -32,6 +32,16 @@
     <div class="row"><span class="mono">Gerät: <span id="dev-name">-</span></span></div>
     <div class="row"><span class="mono">Dienst: <span id="svc-name">-</span></span></div>
     <p class="hint">Läuft in Chrome auf Android oder am Rechner und in Bluefy auf iOS. Safari hat kein Web Bluetooth.</p>
+  </div>
+
+  <div class="card">
+    <h2>Was antwortet uns da</h2>
+    <p class="hint">Dafür wird <b>nichts gesendet</b>. Der Scooter meldet von sich aus, welche Baugruppen er kennt, mit Typ, Code und Version. Diese Seite liest nur mit. Die Liste füllt sich nach dem Verbinden von selbst, manche Angaben kommen erst nach ein paar Sekunden.</p>
+    <pre class="copy" id="inv-out">-</pre>
+    <p class="hint"><b>nicht gemeldet</b> heißt, dass die Gegenstelle für diese Baugruppe nur Füllbytes schickt. Sie weiß dann selbst nichts davon, egal was verbaut ist.</p>
+    <div class="row">
+      <button id="btn-inv-copy" disabled>Inventar kopieren</button>
+    </div>
   </div>
 
   <div class="card">
@@ -92,6 +102,6 @@
   </footer>
 </div>
 
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
