@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v13';
+const BUILD = 'v14';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -822,6 +822,18 @@ window.addEventListener('DOMContentLoaded', () => {
     if (stored) originalName = stored;
   } catch (e) {}
   refreshOrigUi();
+
+  // The build number in the footer comes from this file, and this file is always
+  // fetched fresh because its address carries the version. index.html carries no
+  // version of its own, so it can be older than the script without anything showing
+  // it. The page states its own build now, and a mismatch is said out loud.
+  const pageBuild = document.body.dataset.build || '(keine Angabe)';
+  if (pageBuild !== BUILD) {
+    setStatus('disconnected', 'Seite veraltet');
+    log('ACHTUNG: Markup ist ' + pageBuild + ', Skript ist ' + BUILD + '.');
+    log('Die Seite und das Skript passen nicht zusammen. Was du siehst, ist nicht der');
+    log('Stand, den die Fussleiste behauptet.');
+  }
 
   log('Blade-Test ' + BUILD);
   if (!navigator.bluetooth) log('Kein Web Bluetooth in diesem Browser. Auf iOS Bluefy nutzen.');
