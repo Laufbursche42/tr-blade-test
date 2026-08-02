@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v14';
+const BUILD = 'v15';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -56,6 +56,23 @@ let originalName = null;
 let busy = Promise.resolve();
 
 const $ = id => document.getElementById(id);
+
+// Binding through this means one missing element costs that one control, not the whole
+// startup. An unguarded binding on a null threw and everything after it never ran, so
+// the page looked alive and did nothing.
+function on(id, ev, fn) {
+  const el = $(id);
+  if (el) el.addEventListener(ev, fn);
+  return !!el;
+}
+
+// Every element this script writes to. A page that is older than the script is missing
+// some of them, and then a card silently never appears. Checked once at startup so the
+// answer is a named list instead of a null somewhere deep in a handler.
+const REQUIRED_IDS = ['status', 'log', 'frame', 'build-ver', 'dev-name', 'svc-name',
+  'fin-in', 'btn-conn', 'btn-set', 'btn-restore', 'btn-forget', 'orig-name',
+  'prof-out', 'btn-prof-copy', 'inv-out', 'btn-inv-copy',
+  'probe-node', 'btn-probe', 'btn-probe-all', 'btn-probe-copy', 'probe-out'];
 
 function log(msg) {
   const el = $('log');
@@ -198,6 +215,7 @@ function pnpText(dv) {
 }
 
 async function buildProfile(services) {
+  if (!$('prof-out')) { log('Die Steckbrief-Karte fehlt in dieser Seite, siehe oben.'); return; }
   const lines = [];
   lines.push('Laufbursche Geraetesteckbrief  Build ' + BUILD);
   lines.push('FIN:      ' + ((device && device.name) || '-'));
@@ -816,6 +834,21 @@ async function writeName(name) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  // First thing, before anything can throw on a missing element. The build number in
+  // the footer comes from this file, and this file is always fetched fresh because its
+  // address carries the version. index.html carries no version of its own, so it can be
+  // older than the script while the footer still reads the new build. That looks exactly
+  // like a feature that was never built, so it gets named instead of guessed at.
+  const pageBuild = (document.body.dataset && document.body.dataset.build) || '(keine Angabe)';
+  const missing = REQUIRED_IDS.filter(id => !$(id));
+  if (pageBuild !== BUILD || missing.length) {
+    if ($('status')) setStatus('disconnected', 'Seite veraltet');
+    log('ACHTUNG: Markup ist ' + pageBuild + ', Skript ist ' + BUILD + '.');
+    if (missing.length) log('Es fehlen diese Elemente: ' + missing.join(', '));
+    log('Seite und Skript passen nicht zusammen. Was du siehst, ist aelter als das,');
+    log('was die Fussleiste behauptet. Die Fussleiste kommt naemlich aus dem Skript.');
+  }
+
   $('build-ver').textContent = 'Build ' + BUILD;
   try {
     const stored = localStorage.getItem(LS_ORIG);
@@ -823,22 +856,10 @@ window.addEventListener('DOMContentLoaded', () => {
   } catch (e) {}
   refreshOrigUi();
 
-  // The build number in the footer comes from this file, and this file is always
-  // fetched fresh because its address carries the version. index.html carries no
-  // version of its own, so it can be older than the script without anything showing
-  // it. The page states its own build now, and a mismatch is said out loud.
-  const pageBuild = document.body.dataset.build || '(keine Angabe)';
-  if (pageBuild !== BUILD) {
-    setStatus('disconnected', 'Seite veraltet');
-    log('ACHTUNG: Markup ist ' + pageBuild + ', Skript ist ' + BUILD + '.');
-    log('Die Seite und das Skript passen nicht zusammen. Was du siehst, ist nicht der');
-    log('Stand, den die Fussleiste behauptet.');
-  }
-
   log('Blade-Test ' + BUILD);
   if (!navigator.bluetooth) log('Kein Web Bluetooth in diesem Browser. Auf iOS Bluefy nutzen.');
 
-  $('btn-conn').addEventListener('click', () => {
+  on('btn-conn', 'click', () => {
     if (device && device.gatt && device.gatt.connected) disconnect(); else pickAndConnect();
   });
   const sel = $('probe-node');
@@ -851,13 +872,13 @@ window.addEventListener('DOMContentLoaded', () => {
   renderReport();
   renderInventory();
 
-  $('btn-probe').addEventListener('click', () => {
+  on('btn-probe', 'click', () => {
     const id = parseInt(sel.value, 10);
     const node = NODES.find(n => n.id === id);
     if (node) runProbe([node]);
   });
-  $('btn-probe-all').addEventListener('click', () => runProbe(NODES));
-  $('btn-probe-copy').addEventListener('click', async () => {
+  on('btn-probe-all', 'click', () => runProbe(NODES));
+  on('btn-probe-copy', 'click', async () => {
     try {
       await navigator.clipboard.writeText($('probe-out').textContent);
       log('Protokoll in die Zwischenablage gelegt');
@@ -866,13 +887,13 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  $('btn-set').addEventListener('click', () => writeName($('fin-in').value.trim()));
-  $('btn-restore').addEventListener('click', () => {
+  on('btn-set', 'click', () => writeName($('fin-in').value.trim()));
+  on('btn-restore', 'click', () => {
     if (!originalName) { log('keine urspruengliche FIN gemerkt'); return; }
     writeName(originalName);
   });
-  $('btn-forget').addEventListener('click', forgetOriginal);
-  $('btn-prof-copy').addEventListener('click', async () => {
+  on('btn-forget', 'click', forgetOriginal);
+  on('btn-prof-copy', 'click', async () => {
     try {
       await navigator.clipboard.writeText($('prof-out').textContent);
       log('Steckbrief in die Zwischenablage gelegt');
@@ -880,7 +901,7 @@ window.addEventListener('DOMContentLoaded', () => {
       log('Kopieren ging nicht, den Text bitte von Hand markieren');
     }
   });
-  $('btn-inv-copy').addEventListener('click', async () => {
+  on('btn-inv-copy', 'click', async () => {
     try {
       await navigator.clipboard.writeText($('inv-out').textContent);
       log('Inventar in die Zwischenablage gelegt');
@@ -888,5 +909,5 @@ window.addEventListener('DOMContentLoaded', () => {
       log('Kopieren ging nicht, den Text bitte von Hand markieren');
     }
   });
-  $('fin-in').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-set').click(); });
+  on('fin-in', 'keydown', e => { if (e.key === 'Enter') $('btn-set').click(); });
 });
