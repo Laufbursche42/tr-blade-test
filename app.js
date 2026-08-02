@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v15';
+const BUILD = 'v16';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -47,6 +47,7 @@ const LS_ORIG = 'fintest_orig_name';
 let device = null;
 let writeChar = null;
 let writeUuid = null;
+let writeChars = [];   // every writable characteristic, not just the chosen one
 let notifyUuids = [];
 let rxCount = 0;        // everything heard since connect, telemetry included
 let rxLastUuid = null;  // which channel last delivered, so a silent probe is explainable
@@ -74,15 +75,20 @@ const REQUIRED_IDS = ['status', 'log', 'frame', 'build-ver', 'dev-name', 'svc-na
   'prof-out', 'btn-prof-copy', 'inv-out', 'btn-inv-copy',
   'probe-node', 'btn-probe', 'btn-probe-all', 'btn-probe-copy', 'probe-out'];
 
+// Both survive a page that is missing the element, so a mismatch can still be reported
+// instead of throwing while trying to report itself.
 function log(msg) {
   const el = $('log');
   const t = new Date().toTimeString().slice(0, 8);
-  el.textContent = t + '  ' + msg + '\n' + el.textContent;
+  if (el) el.textContent = t + '  ' + msg + '\n' + el.textContent;
+  else console.log(t + '  ' + msg);
 }
 
 function setStatus(state, text) {
-  $('status').dataset.state = state;
-  $('status').textContent = text;
+  const el = $('status');
+  if (!el) return;
+  el.dataset.state = state;
+  el.textContent = text;
 }
 
 // ── CRC-8, poly 0x07, the exact port ─────────────────────────────────────────
@@ -149,10 +155,11 @@ function splitFrames(v) {
 }
 
 // Web Bluetooth rejects a write while another is in flight, so every write queues.
-function send(bytes, what) {
+function send(bytes, what, viaChar) {
   busy = busy.then(async () => {
-    if (!writeChar) throw new Error('keine Schreib-Charakteristik');
-    await writeChar.writeValue(bytes);
+    const ch = viaChar || writeChar;
+    if (!ch) throw new Error('keine Schreib-Charakteristik');
+    await ch.writeValue(bytes);
     if (what) {
       log(what + ': ' + hex(bytes));
       $('frame').textContent = hex(bytes);
@@ -557,7 +564,7 @@ function onProbeFrame(v, uuid) {
   return true;
 }
 
-async function probeNode(node) {
+async function probeNode(node, viaChar) {
   const frame = handshakeFrame(node.id, PROBE_PROJECT_CODE);
   const sent = hex(frame);
   const rxBefore = rxCount;
@@ -576,12 +583,13 @@ async function probeNode(node) {
     }, PROBE_TIMEOUT_MS);
     probeWaiting = { node: node, resolve: resolve, timer: timer, sent: sent };
   });
-  await send(frame, 'Node-Anfrage');
+  await send(frame, 'Node-Anfrage', viaChar);
   // The app repeats an unanswered handshake after three seconds, so do the same once.
-  const repeat = setTimeout(() => { if (probeWaiting) send(frame, null); }, PROBE_RESEND_MS);
+  const repeat = setTimeout(() => { if (probeWaiting) send(frame, null, viaChar); }, PROBE_RESEND_MS);
   const r = await answer;
   clearTimeout(repeat);
   log('Node ' + r.node.id + ': ' + r.res.title);
+  r.via_write = (viaChar || writeChar).uuid;
   return r;
 }
 
@@ -591,7 +599,8 @@ function renderReport() {
   lines.push('Laufbursche Node-Abfrage  Build ' + BUILD);
   lines.push('FIN:          ' + (n || '-'));
   lines.push('Dienst:       ' + ($('svc-name').textContent || '-'));
-  lines.push('Schreiben:    ' + (writeUuid || '-'));
+  lines.push('Schreiben:    ' + (writeChars.length
+    ? writeChars.map(c => c.uuid).join('\n              ') : (writeUuid || '-')));
   lines.push('Melden:       ' + (notifyUuids.length ? notifyUuids.join('\n              ') : '-'));
   lines.push('Empfangen:    ' + rxCount + ' Rahmen seit dem Verbinden'
              + (rxLastUuid ? ', zuletzt ueber ' + rxLastUuid : ''));
@@ -604,7 +613,8 @@ function renderReport() {
     lines.push('    empfangen: ' + (r.got || '(nichts)'));
     lines.push('    Ergebnis:  ' + r.res.title);
     lines.push('               ' + r.res.note);
-    if (r.via) lines.push('    Kanal:     ' + r.via);
+    if (r.via_write) lines.push('    geschrieben ueber: ' + r.via_write);
+    if (r.via) lines.push('    geantwortet ueber: ' + r.via);
     if (r.got) answered++;
   }
   lines.push('');
@@ -641,10 +651,15 @@ async function runProbe(nodes) {
   }
   setProbeBusy(true);
   probeReport = [];
+  const cands = writeChars.length ? writeChars : [writeChar];
   try {
-    for (const node of nodes) {
-      probeReport.push(await probeNode(node));
-      renderReport();
+    for (const ch of cands) {
+      if (cands.length > 1) log('Schreibe jetzt ueber ' + ch.uuid);
+      for (const node of nodes) {
+        probeReport.push(await probeNode(node, ch));
+        renderReport();
+      }
+      if (probeReport.some(r => r.got)) break;   // an answer settles it, no need to go on
     }
   } finally {
     setProbeBusy(false);
@@ -742,9 +757,13 @@ async function connectTo(dev) {
       // be writable" is not the same thing on every Bluetooth stack.
       const fixed = chars.find(c => c.uuid === ISSC_WRITE
                                  && (c.properties.write || c.properties.writeWithoutResponse));
-      const w = fixed || chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+      // Keep every writable one. Microchip's profile offers two, and which of them is
+      // the data input is not something to assume when a silent probe is the result.
+      const all = chars.filter(c => c.properties.write || c.properties.writeWithoutResponse);
+      const w = fixed || all[0];
       if (w) {
-        picked = { svc: svc, write: w, notify: chars.filter(c => c.properties.notify) };
+        picked = { svc: svc, write: w, notify: chars.filter(c => c.properties.notify),
+                   writable: [w].concat(all.filter(c => c !== w)) };
         if (svc.uuid === ISSC_SERVICE) break;   // the usual one wins
       }
     }
@@ -752,6 +771,11 @@ async function connectTo(dev) {
 
     writeChar = picked.write;
     writeUuid = picked.write.uuid;
+    writeChars = picked.writable;
+    if (writeChars.length > 1) {
+      log('Weitere Schreib-Charakteristiken: '
+          + writeChars.slice(1).map(c => c.uuid).join(', '));
+    }
     $('svc-name').textContent = picked.svc.uuid;
     log('Dienst ' + picked.svc.uuid);
     log('Schreiben auf ' + writeUuid);
