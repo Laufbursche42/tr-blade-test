@@ -9,7 +9,7 @@
 <title>Laufbursche Blade-Test</title>
 <link rel="stylesheet" href="styles.css?v=16">
 </head>
-<body data-build="v18-blade-cruise-send">
+<body data-build="v19-blade-cruise-send">
 <div class="wrap">
   <header>
     <h1>Laufbursche <span>Blade-Test</span></h1>
@@ -64,7 +64,7 @@
       <button id="btn-unlock-man" disabled>Entsperren: Tempomat manuell (2)</button>
       <button id="btn-lock" disabled>Sperren: Tempomat aus (0)</button>
     </div>
-    <p class="hint">Erst <b>Verbinden</b> und kurz warten, bis ein <span class="mono">55 71</span> ankam (dann werden die Knoepfe aktiv). Ablauf: einmal <b>Tempomat aus</b> senden und per Live-Cam pruefen, ob gedrosselt; dann <b>Tempomat auto</b> und pruefen, ob frei. Danach oben <b>Inventar kopieren</b> und mir schicken - die <b>DIFF</b>-Zeile bei <span class="mono">55 71</span> zeigt, welches Byte den echten Zustand traegt. Wenn sich physisch nichts aendert, ist der Tempomat am Blade nicht der Hebel und wir sehen es an der ausbleibenden Aenderung.</p>
+    <p class="hint">Der Tempomat-Befehl kippt im ESC die Klemme - das ist die <b>Aktion</b> zum Ent- und Sperren, und die steht fest. Zum <b>Erkennen</b>, ob der Blade gesperrt ist, taugt der Tempomat-Wert dagegen nicht, weil er sofort auf Aus zurückfällt. Diese Knöpfe schalten den Zustand also nur hin und her, damit die <b>DIFF</b>-Zeile bei <span class="mono">55 71</span> zeigt, welches Byte den Zustand <b>dauerhaft</b> trägt. Ablauf: erst <b>Verbinden</b> und warten, bis die Knöpfe aktiv werden; dann <b>Tempomat aus</b> senden und per Live-Cam prüfen (gedrosselt?); dann <b>Tempomat auto</b> (frei?); danach oben <b>Inventar kopieren</b> und mir schicken.</p>
   </div>
 
   <div class="card">
