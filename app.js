@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v19-blade-cruise-send';
+const BUILD = 'v20-blade-current-decode';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -429,6 +429,10 @@ const DECODERS = {
               ['Radgroesse', (0.1 * v[6]).toFixed(1) + ' Zoll'],
               ['Speed-Limit (Byte11)', String(v[11])],
               ['Speed per Gang (Byte10)', String(v[10])],
+              ['Strom vorn (Byte12)', String(v[12])],
+              ['Strom hinten (Byte13)', String(v[13])],
+              ['eABS/F-Start (Byte8)', hex([v[8]]) + ' (' + ((v[8] >> 4) & 15) + '/' + (v[8] & 15) + ')'],
+              ['eABS/R-Start (Byte9)', hex([v[9]]) + ' (' + ((v[9] >> 4) & 15) + '/' + (v[9] & 15) + ')'],
               ['Polpaare', String(v[5])],
               ['Pack-Spannung', String(v[15])],
               ['Temperatur', String(v[7])],
