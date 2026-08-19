@@ -9,7 +9,7 @@
 <title>Laufbursche Blade-Test</title>
 <link rel="stylesheet" href="styles.css?v=16">
 </head>
-<body data-build="v17-blade-lock-capture">
+<body data-build="v18-blade-cruise-send">
 <div class="wrap">
   <header>
     <h1>Laufbursche <span>Blade-Test</span></h1>
@@ -54,6 +54,17 @@
       <li>Unten auf <b>Inventar kopieren</b> tippen und mir den ganzen Text schicken.</li>
     </ol>
     <p class="hint">Weil die Seite <b>jede abweichende Ausprägung</b> eines Rahmens einzeln behaelt, hat <span class="mono">55 71</span> danach zwei Ausprägungen (gesperrt und entsperrt). Die neue Zeile <b>DIFF ueber Ausprägungen</b> zeigt dann genau das Byte, das sich unterscheidet und bleibt. Beachte besonders <span class="mono">Byte17 Systemstatus</span>, <span class="mono">Bit6</span> und <span class="mono">Speed-Limit</span>. Achte darauf, waehrend der Aufnahme <b>nicht den Gang zu wechseln</b>, sonst aendert sich Byte3 mit.</p>
+  </div>
+
+  <div class="card">
+    <h2>Tempomat senden (entsperren/sperren auf dieser Seite)</h2>
+    <p class="warn">Bluetooth ist exklusiv: du kannst nicht gleichzeitig mit der Teverun-App verbunden sein. Darum senden diese Knoepfe den Tempomat-Befehl direkt von hier. Es geht der normale <span class="mono">0x18</span>-Einstellungsrahmen raus, alle uebrigen Werte werden aus dem letzten <span class="mono">55 71</span> unveraendert gespiegelt, nur der Tempomat aendert sich.</p>
+    <div class="btns">
+      <button class="primary" id="btn-unlock-auto" disabled>Entsperren: Tempomat auto (1)</button>
+      <button id="btn-unlock-man" disabled>Entsperren: Tempomat manuell (2)</button>
+      <button id="btn-lock" disabled>Sperren: Tempomat aus (0)</button>
+    </div>
+    <p class="hint">Erst <b>Verbinden</b> und kurz warten, bis ein <span class="mono">55 71</span> ankam (dann werden die Knoepfe aktiv). Ablauf: einmal <b>Tempomat aus</b> senden und per Live-Cam pruefen, ob gedrosselt; dann <b>Tempomat auto</b> und pruefen, ob frei. Danach oben <b>Inventar kopieren</b> und mir schicken - die <b>DIFF</b>-Zeile bei <span class="mono">55 71</span> zeigt, welches Byte den echten Zustand traegt. Wenn sich physisch nichts aendert, ist der Tempomat am Blade nicht der Hebel und wir sehen es an der ausbleibenden Aenderung.</p>
   </div>
 
   <div class="card">

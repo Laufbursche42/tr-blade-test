@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v17-blade-lock-capture';
+const BUILD = 'v18-blade-cruise-send';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -73,6 +73,7 @@ function on(id, ev, fn) {
 const REQUIRED_IDS = ['status', 'log', 'frame', 'build-ver', 'dev-name', 'svc-name',
   'fin-in', 'btn-conn', 'btn-set', 'btn-restore', 'btn-forget', 'orig-name',
   'prof-out', 'btn-prof-copy', 'inv-out', 'btn-inv-copy',
+  'btn-unlock-auto', 'btn-unlock-man', 'btn-lock',
   'probe-node', 'btn-probe', 'btn-probe-all', 'btn-probe-copy', 'probe-out'];
 
 // Both survive a page that is missing the element, so a mismatch can still be reported
@@ -152,6 +153,123 @@ function splitFrames(v) {
   const out = [];
   for (let i = 0; i < v.length; i += 20) out.push(v.subarray(i, i + 20));
   return out;
+}
+
+// ── settings state + cruise (Tempomat) command ───────────────────────────────
+// The eKFV clamp lever in the native Teverun app (v2.0.5, uni.UNI2202FAB) is the cruise
+// mode carried in the 0x18 settings frame. To flip ONLY cruise without disturbing anything
+// else, the whole controller state is mirrored from the last 55 71 and only S.cruise changes.
+// This is a byte-for-byte port of the app's sendSettingCode / the 55 71 parse.
+
+function bytesToInt(bitsArr) {           // LSB-first: index 0 = bit0
+  let x = 0;
+  for (let i = 0; i < bitsArr.length; i++) if (bitsArr[i] & 1) x |= (1 << i);
+  return x & 0xFF;
+}
+function bytesToInt2(bitsArr) {          // MSB-first: index 0 = most-significant bit
+  let x = 0; const n = bitsArr.length;
+  for (let i = 0; i < n; i++) if (bitsArr[i] & 1) x |= (1 << (n - 1 - i));
+  return x & 0xFF;
+}
+function nibbles(high, low) {
+  const b = new Array(8).fill(0);
+  for (let k = 0; k < 4; k++) b[k] = (high >> (3 - k)) & 1;
+  for (let k = 0; k < 4; k++) b[4 + k] = (low >> (3 - k)) & 1;
+  return b;
+}
+function applyCruise(bitsArr, cruise) {  // 2 -> bit2; 1 -> bit0 & bit1; 0 -> none
+  if (cruise === 2) bitsArr[2] = 1;
+  else if (cruise === 1) { bitsArr[0] = 1; bitsArr[1] = 1; }
+}
+function voltCode(pv) {
+  switch (pv) {
+    case 36: return 30; case 48: return 39; case 52: return 42;
+    case 60: return 48; case 72: return 60; case 84: return 69;
+    default: return pv & 0xFF;
+  }
+}
+
+const S = {
+  gear: 1, wheel: 8.5, sysProTemp: 80, motorPolePairs: 15,
+  assistSpeedLimit: 25, speedLimit: 25, fCurrent: 0, rCurrent: 0, packVolt: 60,
+  enfEcon: false, isUnitMile: false, atMode: false, isSmart: false,
+  cruise: 0, abs: false, startMode: false,
+  fStartLevel: 0, rStartLevel: 0, eabsLevel: 0, sleepTime: 0, prTime: 0,
+  rmStatus: 1, doubleMotor: 1, systemStatus6: 0, received71: false,
+};
+
+function updateFrom71(t) {
+  S.gear = t[3] & 0xFF;
+  const r = t[4] & 0xFF;
+  S.cruise = (((r >> 2) & 1) << 1) | ((r >> 1) & 1);
+  S.abs = ((r >> 3) & 1) !== 0;
+  S.startMode = ((r >> 6) & 1) !== 0;
+  S.motorPolePairs = t[5] & 0xFF;
+  S.wheel = (t[6] & 0xFF) * 0.1;
+  S.sysProTemp = t[7] & 0xFF;
+  S.fStartLevel = t[8] & 0x0F;
+  S.eabsLevel = (t[9] >> 4) & 0x0F;
+  S.rStartLevel = t[9] & 0x0F;
+  S.assistSpeedLimit = t[10] & 0xFF;
+  S.speedLimit = t[11] & 0xFF;
+  S.fCurrent = t[12] & 0xFF;
+  S.rCurrent = t[13] & 0xFF;
+  S.packVolt = t[15] & 0xFF;
+  const sys = t[17] & 0xFF;
+  S.enfEcon = (sys & 0x01) !== 0;
+  S.isUnitMile = (sys & 0x02) !== 0;
+  S.atMode = (sys & 0x04) !== 0;
+  S.isSmart = (sys & 0x10) !== 0;
+  S.systemStatus6 = (sys >> 6) & 1;
+  const sp = t[18] & 0xFF;
+  S.sleepTime = sp & 0x07;
+  S.prTime = (sp >> 3) & 0x1F;
+  S.received71 = true;
+}
+
+function buildSettingFrame() {
+  const a = new Array(19).fill(0xFF);
+  a[0] = 0xAA; a[1] = 24; a[2] = 2; a[3] = S.gear & 0xFF;
+  const s4 = new Array(8).fill(0);
+  applyCruise(s4, S.cruise); s4[3] = S.abs ? 1 : 0; s4[6] = S.startMode ? 1 : 0; s4[7] = S.rmStatus & 1;
+  a[4] = bytesToInt(s4);
+  a[5] = S.motorPolePairs & 0xFF;
+  a[6] = Math.round(S.wheel * 10.0) & 0xFF;
+  a[7] = S.sysProTemp & 0xFF;
+  a[8] = bytesToInt2(nibbles(S.eabsLevel, S.fStartLevel));
+  a[9] = bytesToInt2(nibbles(S.eabsLevel, S.rStartLevel));
+  a[10] = S.assistSpeedLimit & 0xFF;
+  a[11] = S.speedLimit & 0xFF;
+  a[12] = S.fCurrent & 0xFF;
+  a[13] = S.rCurrent & 0xFF;
+  a[14] = voltCode(S.packVolt);
+  a[15] = S.packVolt & 0xFF;
+  const d = new Array(8).fill(0);
+  d[0] = S.enfEcon ? 1 : 0; d[1] = S.isUnitMile ? 1 : 0; d[2] = S.atMode ? 1 : 0; d[4] = S.isSmart ? 1 : 0;
+  a[16] = bytesToInt(d);
+  const s17 = new Array(8).fill(0);
+  applyCruise(s17, S.cruise); s17[3] = S.abs ? 1 : 0; s17[6] = S.startMode ? 1 : 0; s17[7] = S.doubleMotor & 1;
+  a[17] = bytesToInt(s17);
+  a[18] = ((S.prTime & 0x1F) << 3) | (S.sleepTime & 0x07);
+  return finalizeFrame(a);
+}
+
+// Send the settings frame with a chosen cruise value. 1 = auto, 2 = manual (both lift the
+// clamp in the native app), 0 = off. Everything else mirrors the last 55 71, so ONLY cruise
+// changes. Needs a 55 71 first, otherwise the mirrored state would be defaults, not the scooter's.
+function sendCruise(value) {
+  if (!writeChar) { log('erst verbinden'); return; }
+  if (!S.received71) { log('warte auf 55 71 (Einstellungen), bevor gesendet wird'); return; }
+  S.cruise = value;
+  send(buildSettingFrame(), 'Tempomat=' + value + ' (0x18 Einstellungsrahmen)');
+  log('gesendet: Tempomat=' + value + '. Jetzt Live-Cam + DIFF im Inventar beobachten.');
+}
+
+function refreshUnlockButtons() {
+  const ok = !!writeChar && S.received71;
+  ['btn-unlock-auto', 'btn-unlock-man', 'btn-lock'].forEach(id => {
+    const el = $(id); if (el) el.disabled = !ok;
+  });
 }
 
 // Web Bluetooth rejects a write while another is in flight, so every write queues.
@@ -410,6 +528,8 @@ function onInfoFrame(v) {
   const sub = v[1];
   invSeen[sub] = (invSeen[sub] || 0) + 1;
   noteVariant(sub, v);
+
+  if (sub === 0x71) { updateFrom71(v); refreshUnlockButtons(); }
 
   if (sub === 0x41) {
     const c = invAscii(v, 2, 15);
@@ -717,6 +837,8 @@ function onDisconnected() {
   $('btn-conn').textContent = 'Verbinden';
   $('fin-in').disabled = true;
   $('btn-set').disabled = true;
+  S.received71 = false;
+  refreshUnlockButtons();
   refreshOrigUi();
   $('svc-name').textContent = '-';
   setProbeBusy(false);
@@ -954,5 +1076,9 @@ window.addEventListener('DOMContentLoaded', () => {
       log('Kopieren ging nicht, den Text bitte von Hand markieren');
     }
   });
+
+  on('btn-unlock-auto', 'click', () => sendCruise(1));
+  on('btn-unlock-man', 'click', () => sendCruise(2));
+  on('btn-lock', 'click', () => sendCruise(0));
   on('fin-in', 'keydown', e => { if (e.key === 'Enter') $('btn-set').click(); });
 });
