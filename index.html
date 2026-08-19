@@ -45,6 +45,18 @@
   </div>
 
   <div class="card">
+    <h2>Sperr-Test: gesperrt gegen entsperrt aufnehmen</h2>
+    <p class="hint">Das hier ist der eigentliche Test. Ziel: herausfinden, an welchem <b>Byte</b> der Scooter dauerhaft anzeigt, ob er gedrosselt (22) oder frei (65) ist. Der Tempomat taugt dafuer nicht, weil er am Blade sofort wieder auf Aus springt. Es wird <b>nichts gesendet</b>, die Seite liest nur mit.</p>
+    <ol class="hint">
+      <li><b>Verbinden</b> (Karte oben). Ein paar Sekunden streamen lassen.</li>
+      <li>Scooter in den <b>gesperrten</b> Zustand bringen (22). Rund 10 Sekunden warten, damit <span class="mono">55 71</span> sicher durchlaeuft.</li>
+      <li>Scooter mit deiner bisher funktionierenden Methode <b>entsperren</b> (65). Wieder rund 10 Sekunden warten.</li>
+      <li>Unten auf <b>Inventar kopieren</b> tippen und mir den ganzen Text schicken.</li>
+    </ol>
+    <p class="hint">Weil die Seite <b>jede abweichende Ausprägung</b> eines Rahmens einzeln behaelt, hat <span class="mono">55 71</span> danach zwei Ausprägungen (gesperrt und entsperrt). Die neue Zeile <b>DIFF ueber Ausprägungen</b> zeigt dann genau das Byte, das sich unterscheidet und bleibt. Beachte besonders <span class="mono">Byte17 Systemstatus</span>, <span class="mono">Bit6</span> und <span class="mono">Speed-Limit</span>. Achte darauf, waehrend der Aufnahme <b>nicht den Gang zu wechseln</b>, sonst aendert sich Byte3 mit.</p>
+  </div>
+
+  <div class="card">
     <h2>Was antwortet uns da</h2>
     <p class="hint">Dafür wird <b>nichts gesendet</b>. Der Scooter meldet von sich aus, welche Baugruppen er kennt, mit Typ, Code und Version. Diese Seite liest nur mit. Die Liste füllt sich nach dem Verbinden von selbst, manche Angaben kommen erst nach ein paar Sekunden.</p>
     <pre class="copy" id="inv-out">-</pre>

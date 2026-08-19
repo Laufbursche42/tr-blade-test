@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v16';
+const BUILD = 'v17-blade-lock-capture';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -309,7 +309,8 @@ const DECODERS = {
                 .map(i => v[i] - 40).join(' ') + ' C']],
   0x71: v => [['Gang', String(v[3])],
               ['Radgroesse', (0.1 * v[6]).toFixed(1) + ' Zoll'],
-              ['Speed-Limit', String(v[11])],
+              ['Speed-Limit (Byte11)', String(v[11])],
+              ['Speed per Gang (Byte10)', String(v[10])],
               ['Polpaare', String(v[5])],
               ['Pack-Spannung', String(v[15])],
               ['Temperatur', String(v[7])],
@@ -317,7 +318,12 @@ const DECODERS = {
               ['ABS', bits(v[4])[3]],
               ['Anfahrmodus', bits(v[4])[6]],
               ['Smart', bits(v[17])[4]],
-              ['Meilen', bits(v[17])[1]]],
+              ['Meilen', bits(v[17])[1]],
+              // Kandidaten fuer den bleibenden eKFV-Sperrzustand (der Tempomat faellt am Blade
+              // sofort zurueck, deshalb hier die vollen Statusbytes samt einzelner Bits sichtbar):
+              ['Byte4 Steuerstatus', hex([v[4]]) + '  bits ' + bits(v[4]).join('')],
+              ['Byte17 Systemstatus', hex([v[17]]) + '  bits ' + bits(v[17]).join('')],
+              ['eKFV-Klemme? Byte17 Bit6', bits(v[17])[6]]],
   0x72: v => [['Strom hinten', (0.1 * u16(v, 12)).toFixed(1) + ' A'],
               ['Strom vorn', (0.1 * u16(v, 4)).toFixed(1) + ' A'],
               ['Motortemperatur hinten', String(v[17])],
@@ -469,6 +475,21 @@ function renderInventory() {
         try { fields = dec(bytes); } catch (e) { fields = null; }
         if (!fields) { lines.push('        Auswertung fehlgeschlagen.'); continue; }
         for (const f of fields) lines.push('        ' + pad(f[0] + ':') + f[1]);
+      }
+      // Byte-Diff ueber die Ausprägungen: genau hier wird das bleibende Sperr-Byte sichtbar.
+      // Wenn 55 71 gesperrt vs entsperrt zweimal streamt, zeigt diese Zeile das/die Byte(s),
+      // die sich unterscheiden - unabhaengig davon, ob es der Tempomat oder etwas anderes ist.
+      if (variants.length >= 2) {
+        const rows = variants.map(r => r.split(' ').map(h => parseInt(h, 16)));
+        const cols = Math.max(...rows.map(r => r.length));
+        const diffs = [];
+        for (let i = 0; i < cols; i++) {
+          const vals = rows.map(r => r[i]);
+          if (vals.some(x => x !== vals[0])) {
+            diffs.push('B' + i + '=' + vals.map(x => (x === undefined ? '--' : hex([x]))).join('/'));
+          }
+        }
+        lines.push('  DIFF ueber Ausprägungen: ' + (diffs.length ? diffs.join('  ') : 'keine'));
       }
     }
   }
