@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v20-blade-current-decode';
+const BUILD = 'v21-blade-assembly-req';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -73,7 +73,7 @@ function on(id, ev, fn) {
 const REQUIRED_IDS = ['status', 'log', 'frame', 'build-ver', 'dev-name', 'svc-name',
   'fin-in', 'btn-conn', 'btn-set', 'btn-restore', 'btn-forget', 'orig-name',
   'prof-out', 'btn-prof-copy', 'inv-out', 'btn-inv-copy',
-  'btn-unlock-auto', 'btn-unlock-man', 'btn-lock',
+  'btn-unlock-auto', 'btn-unlock-man', 'btn-lock', 'btn-req-info',
   'probe-node', 'btn-probe', 'btn-probe-all', 'btn-probe-copy', 'probe-out'];
 
 // Both survive a page that is missing the element, so a mismatch can still be reported
@@ -270,6 +270,22 @@ function refreshUnlockButtons() {
   ['btn-unlock-auto', 'btn-unlock-man', 'btn-lock'].forEach(id => {
     const el = $(id); if (el) el.disabled = !ok;
   });
+  const ri = $('btn-req-info'); if (ri) ri.disabled = !writeChar;   // needs only a link, not 55 71
+}
+
+// The 55 44 / 55 45 / 55 4d assembly-identity frames (proType/proCode per node) do NOT stream on
+// their own - they answer a request. We do not know the exact trigger byte from the app, so this
+// probes the 0x01 info sub-commands (plus the app's AA 01 10 00 keep-alive form). The existing
+// 0x44/0x45/0x4d decoders catch whatever comes back.
+function infoReq(sub) { const a = base(0x01); a[2] = sub & 0xFF; return finalizeFrame(a); }
+async function requestAssemblies() {
+  if (!writeChar) { log('erst verbinden'); return; }
+  const c0 = base(0x01); c0[2] = 0x10; c0[3] = 0x00;   // AA 01 10 00 = the app keep-alive/connect form
+  await send(finalizeFrame(c0), 'connect(0): AA 01 10 00');
+  for (const s of [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x43, 0x44, 0x45, 0x4d]) {
+    await send(infoReq(s), 'infoReq 0x' + s.toString(16).padStart(2, '0'));
+  }
+  log('Baugruppen-/Versions-Anforderungen gesendet - Inventar auf 55 44/45/4d beobachten, dann kopieren.');
 }
 
 // Web Bluetooth rejects a write while another is in flight, so every write queues.
@@ -1081,6 +1097,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  on('btn-req-info', 'click', () => requestAssemblies());
   on('btn-unlock-auto', 'click', () => sendCruise(1));
   on('btn-unlock-man', 'click', () => sendCruise(2));
   on('btn-lock', 'click', () => sendCruise(0));

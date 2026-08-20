@@ -9,7 +9,7 @@
 <title>Laufbursche Blade-Test</title>
 <link rel="stylesheet" href="styles.css?v=16">
 </head>
-<body data-build="v20-blade-current-decode">
+<body data-build="v21-blade-assembly-req">
 <div class="wrap">
   <header>
     <h1>Laufbursche <span>Blade-Test</span></h1>
@@ -65,6 +65,14 @@
       <button id="btn-lock" disabled>Sperren: Tempomat aus (0)</button>
     </div>
     <p class="hint">Der Tempomat-Befehl kippt im ESC die Klemme - das ist die <b>Aktion</b> zum Ent- und Sperren, und die steht fest. Zum <b>Erkennen</b>, ob der Blade gesperrt ist, taugt der Tempomat-Wert dagegen nicht, weil er sofort auf Aus zurückfällt. Diese Knöpfe schalten den Zustand also nur hin und her, damit die <b>DIFF</b>-Zeile bei <span class="mono">55 71</span> zeigt, welches Byte den Zustand <b>dauerhaft</b> trägt. Ablauf: erst <b>Verbinden</b> und warten, bis die Knöpfe aktiv werden; dann <b>Tempomat aus</b> senden und per Live-Cam prüfen (gedrosselt?); dann <b>Tempomat auto</b> (frei?); danach oben <b>Inventar kopieren</b> und mir schicken.</p>
+  </div>
+
+  <div class="card">
+    <h2>Baugruppen-Info anfordern (proType / proCode)</h2>
+    <p class="hint">Die Frames <span class="mono">55 44</span> (Display/Akku/Licht) und <span class="mono">55 45</span> (Motorcontroller = Blade-ESC) streamen nicht von selbst - sie sind Antworten auf eine Anforderung. Dieser Knopf sendet die Anforderungs-Frames; die Antworten erscheinen dann unten im Inventar mit proType und proCode. Damit finden wir den echten Firmware-Schluessel des Blade-ESC.</p>
+    <div class="btns">
+      <button class="primary span2" id="btn-req-info" disabled>Baugruppen-Info anfordern</button>
+    </div>
   </div>
 
   <div class="card">
