@@ -48,6 +48,14 @@ h1 span { color: var(--accent); }
 }
 .banner b { color: var(--accent); }
 
+/* Shared relocation notice: same wording and red look across all Laufbursche tools. */
+.sunset-banner {
+  background: #FF505014; border: 1px solid #FF505040; border-radius: 10px;
+  padding: 11px 14px; font-size: 12px; line-height: 1.5; color: var(--text); margin: 0;
+}
+.sunset-banner b { color: #ff8080; }
+.sunset-banner a { color: #ff8080; text-decoration: underline; }
+
 .card {
   background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
   display: flex; flex-direction: column; gap: 12px;
