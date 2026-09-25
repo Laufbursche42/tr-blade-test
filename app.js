@@ -457,8 +457,8 @@ const DECODERS = {
               ['Anfahrmodus', bits(v[4])[6]],
               ['Smart', bits(v[17])[4]],
               ['Meilen', bits(v[17])[1]],
-              // Kandidaten fuer den bleibenden eKFV-Sperrzustand (der Tempomat faellt am Blade
-              // sofort zurueck, deshalb hier die vollen Statusbytes samt einzelner Bits sichtbar):
+              // Candidates for the persistent eKFV lock state (the cruise value falls back to off
+              // right away on the Blade, so the full status bytes plus their individual bits are shown here):
               ['Byte4 Steuerstatus', hex([v[4]]) + '  bits ' + bits(v[4]).join('')],
               ['Byte17 Systemstatus', hex([v[17]]) + '  bits ' + bits(v[17]).join('')],
               ['eKFV-Klemme? Byte17 Bit6', bits(v[17])[6]]],
@@ -616,9 +616,9 @@ function renderInventory() {
         if (!fields) { lines.push('        Auswertung fehlgeschlagen.'); continue; }
         for (const f of fields) lines.push('        ' + pad(f[0] + ':') + f[1]);
       }
-      // Byte-Diff ueber die Ausprägungen: genau hier wird das bleibende Sperr-Byte sichtbar.
-      // Wenn 55 71 gesperrt vs entsperrt zweimal streamt, zeigt diese Zeile das/die Byte(s),
-      // die sich unterscheiden - unabhaengig davon, ob es der Tempomat oder etwas anderes ist.
+      // Byte diff across the variants: this is exactly where the persistent lock byte shows up.
+      // When 55 71 streams twice, locked vs unlocked, this line shows the byte(s) that
+      // differ - no matter whether it is the cruise value or something else.
       if (variants.length >= 2) {
         const rows = variants.map(r => r.split(' ').map(h => parseInt(h, 16)));
         const cols = Math.max(...rows.map(r => r.length));
