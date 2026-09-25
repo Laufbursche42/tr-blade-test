@@ -17,10 +17,13 @@ A one-page test tool. It connects to a scooter over Web Bluetooth and writes the
 - ask a single assembly whether it is reachable and whether it would take an update, without sending any firmware
 - print the frame that went out, so it can be checked against the firmware
 - forget the remembered identity again
+- keep a full log with timestamped TX/RX hex, a public (anonymized) toggle and a verbose diagnostics toggle, plus copy, clear and save
+
+**Guide: [Deutsch](GUIDE.de.md) | [English](GUIDE.en.md)** walks through every card step by step.
 
 ## What it stores
 
-Writing the original identity back has to survive a reload, so the page keeps it in `localStorage` under the key `fintest_orig_name`. It is written on the first connect and read on every load. The page says so on screen and offers a button that deletes it again. Nothing leaves the device: the page carries `connect-src 'none'` in its own content security policy, so it cannot open an outbound connection at all.
+Writing the original identity back has to survive a reload, so the page keeps it in `localStorage` under the key `fintest_orig_name`. It is written on the first connect and read on every load. The page says so on screen and offers a button that deletes it again. Nothing scooter-related leaves the device: the page's content security policy is `connect-src 'self'`, so it may fetch its own documents (the guide, license, privacy notice and so on) from the same host, but it cannot open a connection to any other server.
 
 The remembered value is the one from the first connect and is not replaced later. On a second scooter the restore button would therefore write the first scooter's identity. Delete the stored value before connecting a different scooter.
 
@@ -99,3 +102,19 @@ Use at your own risk. See the warnings the page itself shows.
 ## Browser
 
 Chrome on Android or desktop and Bluefy on iOS. Safari has no Web Bluetooth at all, so a home-screen bookmark made in Safari cannot work.
+
+## Disclaimer
+
+This is a feasibility study, not a finished product, and a test tool, not a tuning tool. Read the [Disclaimer](DISCLAIMER.md) in full before you write an identity. In short: changing a scooter's identity can affect its road approval, there is no warranty of any kind, and everything you do here you do at your own risk.
+
+## License
+
+PolyForm Noncommercial 1.0.0 with two additional terms, in full in [LICENSE.md](LICENSE.md).
+
+## Privacy
+
+Nothing scooter-related leaves your device; the page only fetches its own files from its host. The details are in [PRIVACY.md](PRIVACY.md).
+
+## Trademarks
+
+An independent project, not affiliated with Teverun. "Teverun", "HobbyWing" and other product names are trademarks of their respective owners and are used here only to say which scooters this page works with. See [TRADEMARKS.md](TRADEMARKS.md).

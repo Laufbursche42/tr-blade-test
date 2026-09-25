@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <!-- No frame-ancestors here: a browser ignores it in a meta element, it only works as an
      HTTP header, and GitHub Pages sends no custom headers. It would only log a warning. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<!-- connect-src 'self': the doc viewer fetches this site's own .md files; still no external network. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Laufbursche Blade-Test</title>
-<link rel="stylesheet" href="styles.css?v=16">
+<link rel="stylesheet" href="styles.css?v=17">
 </head>
-<body data-build="v21">
+<body data-build="v22">
 <div class="wrap">
   <header>
     <h1>Laufbursche <span>Blade-Test</span></h1>
@@ -18,7 +19,7 @@
     </div>
   </header>
 
-  <p class="banner"><b>Kein Tuning-Werkzeug.</b> Diese Seite tunt, entdrosselt oder entsperrt keinen Scooter. Sie schreibt nur die Geräte-Identität - die FIN, also den Bluetooth-Namen, den der Scooter ausstrahlt - und prüft, ob einzelne Baugruppen hinter der Bluetooth-Verbindung erreichbar sind. Die FIN zu ändern schaltet nichts frei: auf einer Laufbursche-Firmware hängt die Drossel am Bluetooth-Schloss, nicht am Namen.</p>
+  <p class="banner" role="note"><b>Testwerkzeug, kein Tuning-Werkzeug.</b> Dies ist eine Machbarkeitsstudie, kein fertiges Produkt: Fehlerfreier Betrieb wird nicht versprochen, es gibt keinerlei Gewährleistung, und alles, was du hier tust, tust du auf eigenes Risiko (<a href="#" data-doc="DISCLAIMER">Haftungsausschluss</a>). Die Seite tunt, entdrosselt oder entsperrt keinen Scooter. Sie schreibt nur die Geräte-Identität - die FIN, also den Bluetooth-Namen, den der Scooter ausstrahlt - und prüft, ob einzelne Baugruppen hinter der Bluetooth-Verbindung erreichbar sind. Die FIN zu ändern schaltet nichts frei: auf einer Laufbursche-Firmware hängt die Drossel am Bluetooth-Schloss, nicht am Namen.</p>
 
   <div class="card">
     <h2>Wozu das hier ist</h2>
@@ -134,17 +135,45 @@
 
   <div class="card">
     <h2>Protokoll</h2>
+    <div class="log-opts">
+      <label class="log-opt"><span>Öffentliches Protokoll (anonymisiert)</span><input type="checkbox" id="public-log" checked></label>
+      <label class="log-opt"><span>Diagnose (ausführlich)</span><input type="checkbox" id="diag-log"></label>
+    </div>
+    <div class="btns">
+      <button type="button" id="btn-copy-log">Kopieren</button>
+      <button type="button" id="btn-clear-log">Leeren</button>
+      <button type="button" id="btn-save-log" class="span2">Speichern</button>
+    </div>
     <pre id="log"></pre>
+    <p class="hint"><span class="log-tx">TX - gesendet</span>, <span class="log-rx">RX - empfangen</span>. Das Protokoll ist technisch (Englisch/ASCII), unabhängig von der Sprache der Seite. Anonymisiert werden Geräte-ID, MAC und lange Hex-Werte.</p>
   </div>
 
   <footer class="foot">
     <span class="foot-links">
+      <a href="#" data-doc="GUIDE">Anleitung</a>
       <a href="https://github.com/Laufbursche42/tr-blade-test" target="_blank" rel="noopener">Quellcode</a>
+      <a href="#" data-doc="README">Readme</a>
+      <a href="#" data-doc="DISCLAIMER">Haftungsausschluss</a>
+      <a href="#" data-doc="LICENSE">Lizenz</a>
+      <a href="#" data-doc="PRIVACY">Datenschutz</a>
+      <a href="#" data-doc="TRADEMARKS">Marken</a>
     </span>
-    <span class="ver" id="build-ver"></span>
+    <span class="ver"><span id="build-ver"></span> - <a href="https://github.com/Laufbursche42/tr-blade-test/issues" target="_blank" rel="noopener">Problem melden</a></span>
+    <a class="foot-copy" href="https://laufbursche42.github.io/Laufbursche42/" target="_blank" rel="noopener">Copyright (c) 2026 Laufbursche</a>
   </footer>
 </div>
 
-<script src="app.js?v=16"></script>
+<dialog id="doc" aria-labelledby="doc-title">
+  <div class="doc-head">
+    <h3 id="doc-title"></h3>
+    <button type="button" id="doc-x">&times;</button>
+  </div>
+  <div class="doc-body" id="doc-body"></div>
+  <div class="doc-foot">
+    <button type="button" id="doc-close">Schließen</button>
+  </div>
+</dialog>
+
+<script src="app.js?v=17"></script>
 </body>
 </html>

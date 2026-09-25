@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v21';
+const BUILD = 'v22';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -45,6 +45,7 @@ const WRITE_GAP_MS = 200;                // the app's spacing between two frames
 const LS_ORIG = 'fintest_orig_name';
 
 let device = null;
+let deviceId = '';     // raw BLE device id, redacted out of the public log
 let writeChar = null;
 let writeUuid = null;
 let writeChars = [];   // every writable characteristic, not just the chosen one
@@ -74,15 +75,82 @@ const REQUIRED_IDS = ['status', 'log', 'frame', 'build-ver', 'dev-name', 'svc-na
   'fin-in', 'btn-conn', 'btn-set', 'btn-restore', 'btn-forget', 'orig-name',
   'prof-out', 'btn-prof-copy', 'inv-out', 'btn-inv-copy',
   'btn-unlock-auto', 'btn-unlock-man', 'btn-lock', 'btn-req-info',
-  'probe-node', 'btn-probe', 'btn-probe-all', 'btn-probe-copy', 'probe-out'];
+  'probe-node', 'btn-probe', 'btn-probe-all', 'btn-probe-copy', 'probe-out',
+  'public-log', 'diag-log', 'btn-copy-log', 'btn-clear-log', 'btn-save-log'];
 
-// Both survive a page that is missing the element, so a mismatch can still be reported
-// instead of throwing while trying to report itself.
-function log(msg) {
-  const el = $('log');
-  const t = new Date().toTimeString().slice(0, 8);
-  if (el) el.textContent = t + '  ' + msg + '\n' + el.textContent;
-  else console.log(t + '  ' + msg);
+// ── log panel (lb-tool-web model) ────────────────────────────────────────────
+// Timestamped, appended newest-at-bottom with autoscroll, coloured TX/RX/ok/err, buffered so a
+// re-render (the Public Log toggle) can rebuild it. Copy / clear / save all use the same redacted
+// text. The transcript is technical English/ASCII, independent of the German UI.
+let logBuffer = [];
+let publicLog = true;    // anonymize the log (default on; toggled by the Public Log checkbox)
+let diagLog = false;     // verbose: keep-alive TX and every telemetry RX frame
+
+// Wrap a value that should be masked in the public log (FIN / advertised name / device id).
+function sens(s) { return '\x01' + String(s) + '\x01'; }
+
+function redact(text) {
+  let s = String(text);
+  if (deviceId) s = s.split(deviceId).join('[redacted-id]');
+  s = s.replace(/\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b/g, '[redacted-mac]');
+  s = s.replace(/\b(secret|token|key|aes|pwd|password|pin|mac|serial|vin|uid|imei)\b(\s*[:=]\s*)("?)([^\s",]+)\3/gi,
+    function (m, k, sep) { return k + sep + '[redacted]'; });
+  s = s.replace(/\b[0-9A-Fa-f]{16,}\b/g, '[redacted-hex]');
+  return s;
+}
+// Public log on = mask the driver-marked spans (\x01..\x01, e.g. FIN) and run redaction. Off = the
+// full raw line (local debugging only, do not share).
+function anonymize(s) {
+  if (publicLog === false) return s.replace(/\x01/g, '');
+  return redact(s.replace(/\x01[^\x01]*\x01/g, 'XX').replace(/\x01/g, ''));
+}
+// Survives a page missing the element, so a mismatch can still be reported instead of throwing
+// while trying to report itself.
+function log(msg, cls) {
+  const ts = new Date().toISOString().slice(11, 19);
+  const raw = '[' + ts + '] ' + msg;
+  logBuffer.push({ raw: raw, cls: cls || '' });
+  const pre = $('log');
+  if (pre) {
+    const span = document.createElement('span');
+    if (cls) span.className = cls;
+    span.textContent = anonymize(raw) + '\n';
+    pre.appendChild(span);
+    pre.scrollTop = pre.scrollHeight;
+  } else {
+    console.log(anonymize(raw));
+  }
+}
+function renderLog() {
+  const pre = $('log'); if (!pre) return;
+  pre.textContent = '';
+  logBuffer.forEach(function (e) {
+    const span = document.createElement('span');
+    if (e.cls) span.className = e.cls;
+    span.textContent = anonymize(e.raw) + '\n';
+    pre.appendChild(span);
+  });
+  pre.scrollTop = pre.scrollHeight;
+}
+function clearLog() { logBuffer = []; const pre = $('log'); if (pre) pre.textContent = ''; log('log cleared'); }
+function copyLog() {
+  const text = logBuffer.map(function (e) { return anonymize(e.raw); }).join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { log('log copied to clipboard', 'log-ok'); },
+      function () { log('clipboard write failed', 'log-err'); });
+  } else { log('clipboard API unavailable', 'log-err'); }
+}
+function saveLog() {
+  const text = logBuffer.map(function (e) { return anonymize(e.raw); }).join('\n');
+  try {
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'laufbursche42-blade-test-log.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    log('log saved', 'log-ok');
+  } catch (e) { log('save failed: ' + (e && e.message ? e.message : e), 'log-err'); }
 }
 
 function setStatus(state, text) {
@@ -258,11 +326,11 @@ function buildSettingFrame() {
 // clamp in the native app), 0 = off. Everything else mirrors the last 55 71, so ONLY cruise
 // changes. Needs a 55 71 first, otherwise the mirrored state would be defaults, not the scooter's.
 function sendCruise(value) {
-  if (!writeChar) { log('erst verbinden'); return; }
-  if (!S.received71) { log('warte auf 55 71 (Einstellungen), bevor gesendet wird'); return; }
+  if (!writeChar) { log('not connected', 'log-err'); return; }
+  if (!S.received71) { log('waiting for 55 71 (settings) before sending', 'log-err'); return; }
   S.cruise = value;
-  send(buildSettingFrame(), 'Tempomat=' + value + ' (0x18 Einstellungsrahmen)');
-  log('gesendet: Tempomat=' + value + '. Jetzt Live-Cam + DIFF im Inventar beobachten.');
+  send(buildSettingFrame(), 'cruise=' + value + ' (0x18 settings frame)');
+  log('sent cruise=' + value + '; now watch the live cam and the DIFF line in the inventory');
 }
 
 function refreshUnlockButtons() {
@@ -279,27 +347,25 @@ function refreshUnlockButtons() {
 // 0x44/0x45/0x4d decoders catch whatever comes back.
 function infoReq(sub) { const a = base(0x01); a[2] = sub & 0xFF; return finalizeFrame(a); }
 async function requestAssemblies() {
-  if (!writeChar) { log('erst verbinden'); return; }
+  if (!writeChar) { log('not connected', 'log-err'); return; }
   const c0 = base(0x01); c0[2] = 0x10; c0[3] = 0x00;   // AA 01 10 00 = the app keep-alive/connect form
-  await send(finalizeFrame(c0), 'connect(0): AA 01 10 00');
+  await send(finalizeFrame(c0), 'connect(0)');
   for (const s of [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x43, 0x44, 0x45, 0x4d]) {
     await send(infoReq(s), 'infoReq 0x' + s.toString(16).padStart(2, '0'));
   }
-  log('Baugruppen-/Versions-Anforderungen gesendet - Inventar auf 55 44/45/4d beobachten, dann kopieren.');
+  log('assembly/version requests sent - watch the inventory for 55 44/45/4d, then copy it');
 }
 
 // Web Bluetooth rejects a write while another is in flight, so every write queues.
 function send(bytes, what, viaChar) {
   busy = busy.then(async () => {
     const ch = viaChar || writeChar;
-    if (!ch) throw new Error('keine Schreib-Charakteristik');
+    if (!ch) throw new Error('no write characteristic');
     await ch.writeValue(bytes);
-    if (what) {
-      log(what + ': ' + hex(bytes));
-      $('frame').textContent = hex(bytes);
-    }
+    if (what) { log('TX ' + what + '  ' + hex(bytes), 'log-tx'); $('frame').textContent = hex(bytes); }
+    else if (diagLog) log('TX ' + hex(bytes), 'log-tx');   // keep-alive / resend: verbose only
     await new Promise(r => setTimeout(r, WRITE_GAP_MS));
-  }).catch(e => { log('Schreiben fehlgeschlagen: ' + (e && e.message ? e.message : e)); });
+  }).catch(e => { log('write failed: ' + (e && e.message ? e.message : e), 'log-err'); });
   return busy;
 }
 
@@ -356,7 +422,7 @@ function pnpText(dv) {
 }
 
 async function buildProfile(services) {
-  if (!$('prof-out')) { log('Die Steckbrief-Karte fehlt in dieser Seite, siehe oben.'); return; }
+  if (!$('prof-out')) { log('device-profile card missing from this page, see above', 'log-err'); return; }
   const lines = [];
   lines.push('Laufbursche Geraetesteckbrief  Build ' + BUILD);
   lines.push('FIN:      ' + ((device && device.name) || '-'));
@@ -729,7 +795,7 @@ async function probeNode(node, viaChar) {
   const frame = handshakeFrame(node.id, PROBE_PROJECT_CODE);
   const sent = hex(frame);
   const rxBefore = rxCount;
-  log('frage Node ' + node.id + ' (' + node.text + ')');
+  log('probing node ' + node.id + ' (' + node.text + ')');
   const answer = new Promise(resolve => {
     const timer = setTimeout(() => {
       probeWaiting = null;
@@ -744,12 +810,12 @@ async function probeNode(node, viaChar) {
     }, PROBE_TIMEOUT_MS);
     probeWaiting = { node: node, resolve: resolve, timer: timer, sent: sent };
   });
-  await send(frame, 'Node-Anfrage', viaChar);
+  await send(frame, 'node query', viaChar);
   // The app repeats an unanswered handshake after three seconds, so do the same once.
   const repeat = setTimeout(() => { if (probeWaiting) send(frame, null, viaChar); }, PROBE_RESEND_MS);
   const r = await answer;
   clearTimeout(repeat);
-  log('Node ' + r.node.id + ': ' + r.res.title);
+  log('node ' + r.node.id + ': ' + r.res.title, r.res.ok ? 'log-ok' : '');
   r.via_write = (viaChar || writeChar).uuid;
   return r;
 }
@@ -805,9 +871,9 @@ function setProbeBusy(on) {
 }
 
 async function runProbe(nodes) {
-  if (!writeChar) { log('nicht verbunden'); return; }
+  if (!writeChar) { log('not connected', 'log-err'); return; }
   if (!notifyUuids.length) {
-    log('Ohne Meldekanal ist keine Abfrage moeglich, es kaeme keine Antwort an.');
+    log('no notify channel: a probe would never hear an answer', 'log-err');
     return;
   }
   setProbeBusy(true);
@@ -815,7 +881,7 @@ async function runProbe(nodes) {
   const cands = writeChars.length ? writeChars : [writeChar];
   try {
     for (const ch of cands) {
-      if (cands.length > 1) log('Schreibe jetzt ueber ' + ch.uuid);
+      if (cands.length > 1) log('now writing via ' + ch.uuid);
       for (const node of nodes) {
         probeReport.push(await probeNode(node, ch));
         renderReport();
@@ -844,8 +910,7 @@ function forgetOriginal() {
   originalName = null;
   try { localStorage.removeItem(LS_ORIG); } catch (e) {}
   refreshOrigUi();
-  log('gemerkte FIN aus dem Browser geloescht. Beim naechsten Verbinden wird der dann');
-  log('gelesene Name als der urspruengliche gemerkt.');
+  log('remembered FIN cleared from the browser; the name read on the next connect becomes the original');
 }
 
 function onDisconnected() {
@@ -862,12 +927,12 @@ function onDisconnected() {
   refreshOrigUi();
   $('svc-name').textContent = '-';
   setProbeBusy(false);
-  log('Verbindung getrennt');
+  log('disconnected');
 }
 
 async function pickAndConnect() {
   if (!navigator.bluetooth) {
-    log('Dieser Browser hat kein Web Bluetooth. Auf iOS Bluefy nutzen.');
+    log('this browser has no Web Bluetooth; use Bluefy on iOS', 'log-err');
     return;
   }
   try {
@@ -881,7 +946,7 @@ async function pickAndConnect() {
     });
   } catch (e) {
     setStatus('disconnected', 'getrennt');
-    log('Auswahl abgebrochen');
+    log('chooser cancelled');
     return;
   }
   await connectTo(device);
@@ -896,6 +961,8 @@ async function connectTo(dev) {
     renderInventory();
     dev.removeEventListener('gattserverdisconnected', onDisconnected);
     dev.addEventListener('gattserverdisconnected', onDisconnected);
+    deviceId = dev.id || '';   // kept out of the public log by redact()
+    log('device chosen ' + sens(dev.name || '(no name)'));
     const server = await dev.gatt.connect();
 
     $('dev-name').textContent = dev.name || '(ohne Namen)';
@@ -911,7 +978,7 @@ async function connectTo(dev) {
 
     // Find a service that carries a writable characteristic.
     const services = await server.getPrimaryServices();
-    log('Dienste gefunden: ' + services.length);
+    log('services found: ' + services.length);
     let picked = null;
     for (const svc of services) {
       const chars = await svc.getCharacteristics();
@@ -930,18 +997,18 @@ async function connectTo(dev) {
         if (svc.uuid === ISSC_SERVICE) break;   // the usual one wins
       }
     }
-    if (!picked) throw new Error('kein Dienst mit beschreibbarer Charakteristik');
+    if (!picked) throw new Error('no service with a writable characteristic');
 
     writeChar = picked.write;
     writeUuid = picked.write.uuid;
     writeChars = picked.writable;
     if (writeChars.length > 1) {
-      log('Weitere Schreib-Charakteristiken: '
+      log('further write characteristics: '
           + writeChars.slice(1).map(c => c.uuid).join(', '));
     }
     $('svc-name').textContent = picked.svc.uuid;
-    log('Dienst ' + picked.svc.uuid);
-    log('Schreiben auf ' + writeUuid);
+    log('service ' + picked.svc.uuid);
+    log('write on ' + writeUuid);
 
     // Subscribe to every notify characteristic, not just the first. The app itself
     // switches to a second one a second after connecting when nothing has arrived
@@ -954,20 +1021,20 @@ async function connectTo(dev) {
           for (const v of splitFrames(new Uint8Array(ev.target.value.buffer))) {
             rxCount++;
             rxLastUuid = nc.uuid;
-            if (onProbeFrame(v, nc.uuid)) continue;  // answer to a node question
-            if (v.length && v[0] === 0x55) { onInfoFrame(v); continue; }
-            log('empfangen: ' + hex(v));
+            if (onProbeFrame(v, nc.uuid)) { log('RX ' + hex(v), 'log-rx'); continue; }  // node answer: always
+            if (v.length && v[0] === 0x55) { if (diagLog) log('RX ' + hex(v), 'log-rx'); onInfoFrame(v); continue; }  // telemetry: verbose only
+            log('RX ' + hex(v), 'log-rx');   // anything else: always
           }
         });
         notifyUuids.push(nc.uuid);
-        log('Benachrichtigungen an ' + nc.uuid);
+        log('notifications on ' + nc.uuid);
       } catch (e) {
-        log('Benachrichtigungen nicht moeglich auf ' + nc.uuid + ': ' + (e && e.message ? e.message : e));
+        log('notifications not available on ' + nc.uuid + ': ' + (e && e.message ? e.message : e), 'log-err');
       }
     }
-    if (!notifyUuids.length) log('Kein Meldekanal. Eine Node-Abfrage kann so nichts hoeren.');
+    if (!notifyUuids.length) log('no notify channel; a node probe cannot hear anything', 'log-err');
 
-    buildProfile(services).catch(e => log('Steckbrief unvollstaendig: ' + (e && e.message ? e.message : e)));
+    buildProfile(services).catch(e => log('device profile incomplete: ' + (e && e.message ? e.message : e), 'log-err'));
 
     setStatus('connected', 'verbunden');
     $('btn-conn').textContent = 'Trennen';
@@ -978,13 +1045,13 @@ async function connectTo(dev) {
     setProbeBusy(false);
 
     // Handshake first, then keep the link alive the way the app does.
-    await send(connectCode(++connectCounter), 'Handschlag');
+    await send(connectCode(++connectCounter), 'handshake');
     stopKeepAlive();
     keepAlive = setInterval(() => {
       if (writeChar) send(connectCode(++connectCounter), null);
     }, CONNECT_CODE_INTERVAL_MS);
   } catch (e) {
-    log('Verbinden fehlgeschlagen: ' + (e && e.message ? e.message : e));
+    log('connect failed: ' + (e && e.message ? e.message : e), 'log-err');
     setStatus('disconnected', 'getrennt');
   }
 }
@@ -1011,13 +1078,141 @@ function validate(name) {
 
 async function writeName(name) {
   const bad = validate(name);
-  if (bad) { log('abgelehnt: ' + bad); return; }
+  if (bad) { log('rejected: ' + bad, 'log-err'); return; }
   setStatus('writing', 'schreiben ...');
-  log('schreibe FIN: "' + name + '"');
-  await send(setDeviceNameFrame(name), 'FIN');
-  log('geschrieben. Die Steuerung legt den Wert im EEPROM ab und gibt ihn an das Bluetooth-Modul weiter.');
-  log('Die Verbindung bricht dabei ab. Danach einmal neu verbinden.');
+  log('writing FIN ' + sens(name), 'log-tx');
+  await send(setDeviceNameFrame(name), 'FIN write');
+  log('written; the controller stores it in EEPROM and hands it to the Bluetooth module');
+  log('the link drops on write; reconnect once afterwards');
   if (device && device.gatt.connected) setStatus('connected', 'verbunden');
+}
+
+// ── document viewer (trbm-unlock model) ──────────────────────────────────────
+// Guide, readme, disclaimer, licence, privacy notice and trademarks are files of this site. They
+// open here, so a reader is never handed a raw markdown file or sent off to a code host. The page
+// is German, so a data-doc name resolves to the German file; the English files ship as the source.
+
+const DOC_TITLES = {
+  'GUIDE.de.md': 'Anleitung', 'README.de.md': 'Readme', 'DISCLAIMER.de.md': 'Haftungsausschluss',
+  'LICENSE.de.md': 'Lizenz', 'PRIVACY.de.md': 'Datenschutz', 'TRADEMARKS.de.md': 'Marken',
+};
+
+const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const slug = s => s.toLowerCase().trim().replace(/[^\w\sÀ-ɏ-]/g, '').replace(/ /g, '-');
+
+// Only the markdown these documents use: headings, lists with one level of nesting, tables, fenced
+// code, quotes, rules, bold, inline code and links.
+function mdToHtml(src) {
+  const inline = s => escHtml(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (all, text, href) => {
+      if (DOC_TITLES[href]) return `<a href="${href}" data-docfile="${href}">${text}</a>`;
+      if (href.startsWith('#')) return `<a href="${href}" data-anchor="${href.slice(1)}">${text}</a>`;
+      return `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
+    });
+
+  const lines = String(src).replace(/\r\n?/g, '\n').split('\n');
+  const out = [];
+  let listKind = null, li = null, para = [], inFence = false;
+  const sink = () => (li ? li.parts : out);
+  const flushPara = () => { if (para.length) { sink().push('<p>' + inline(para.join(' ')) + '</p>'); para = []; } };
+  const closeNested = () => { if (li && li.nested) { li.parts.push('</ul>'); li.nested = false; } };
+  const closeLi = () => { if (!li) return; flushPara(); closeNested(); out.push('<li>' + li.parts.join('\n') + '</li>'); li = null; };
+  const closeList = () => { closeLi(); if (listKind) { out.push('</' + listKind + '>'); listKind = null; } };
+  const block = () => { flushPara(); closeList(); };
+  const openList = kind => { flushPara(); if (listKind !== kind) { closeList(); out.push('<' + kind + '>'); listKind = kind; } else closeLi(); };
+  const cells = l => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const body = l.trim();
+    const indented = /^ {2,}\S/.test(l);
+    if (inFence) {
+      if (body.startsWith('```')) { sink().push('</code></pre>'); inFence = false; } else sink().push(escHtml(l));
+      continue;
+    }
+    if (body.startsWith('```')) { if (li) { flushPara(); closeNested(); } else block(); sink().push('<pre><code>'); inFence = true; continue; }
+    if (body === '') { if (li && /^ {2,}\S/.test(lines[i + 1] || '')) flushPara(); else block(); continue; }
+    if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(body)) { block(); out.push('<hr>'); continue; }
+    if (body.startsWith('|') && /^\|[\s:|-]+\|?\s*$/.test((lines[i + 1] || '').trim())) {
+      if (li) { flushPara(); closeNested(); } else block();
+      sink().push('<div class="doc-table"><table><thead><tr>'
+        + cells(body).map(c => '<th>' + inline(c) + '</th>').join('') + '</tr></thead><tbody>');
+      i++;
+      while (i + 1 < lines.length && lines[i + 1].trim().startsWith('|')) {
+        sink().push('<tr>' + cells(lines[++i].trim()).map(c => '<td>' + inline(c) + '</td>').join('') + '</tr>');
+      }
+      sink().push('</tbody></table></div>');
+      continue;
+    }
+    let m;
+    if ((m = body.match(/^(#{1,4})\s+(.*)$/))) { block(); const n = m[1].length; out.push(`<h${n} id="${slug(m[2])}">${inline(m[2])}</h${n}>`); continue; }
+    if ((m = body.match(/^>\s?(.*)$/))) { if (li) { flushPara(); closeNested(); } else block(); sink().push('<blockquote>' + inline(m[1]) + '</blockquote>'); continue; }
+    if (indented && li && (m = body.match(/^[-*]\s+(.*)$/))) { flushPara(); if (!li.nested) { li.parts.push('<ul class="nested">'); li.nested = true; } li.parts.push('<li>' + inline(m[1]) + '</li>'); continue; }
+    if ((m = body.match(/^[-*]\s+(.*)$/)) && !indented) { openList('ul'); li = { parts: [inline(m[1])], nested: false }; continue; }
+    if ((m = body.match(/^\d+\.\s+(.*)$/)) && !indented) { openList('ol'); li = { parts: [inline(m[1])], nested: false }; continue; }
+    if (li && !indented) closeList();
+    if (li) closeNested();
+    para.push(body);
+  }
+  if (inFence) sink().push('</code></pre>');
+  block();
+  return out.join('\n');
+}
+
+const docCache = {};
+// A data-doc name resolves to the German file; everything the app links internally is a German doc.
+const docFile = name => (name === 'DISCLAIMER') ? 'DISCLAIMER.de.md' : name + '.de.md';
+
+function openDoc(name) { openDocFile(docFile(name)); }
+
+function openDocFile(file, anchor) {
+  const dlg = $('doc'), body = $('doc-body');
+  if (!dlg || !body) return;
+  $('doc-title').textContent = DOC_TITLES[file] || file;
+  if (typeof dlg.showModal === 'function') dlg.showModal();
+  const show = html => {
+    body.innerHTML = html;   // scan-ok: markdown of our own documents, rendered by mdToHtml which escapes first
+    const h1 = body.querySelector('h1');
+    if (h1) { $('doc-title').textContent = h1.textContent.trim(); h1.remove(); }
+    body.scrollTop = 0;
+    if (!anchor) return;
+    const target = body.querySelector('#' + (window.CSS && CSS.escape ? CSS.escape(anchor) : anchor));
+    if (target) body.scrollTop = target.offsetTop - body.offsetTop;
+  };
+  if (docCache[file]) { show(docCache[file]); return; }
+  body.innerHTML = '<p>' + escHtml('wird geladen ...') + '</p>';   // scan-ok: escaped literal
+  fetch(file + '?v=' + BUILD)
+    .then(r => { if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.text(); })
+    .then(txt => { docCache[file] = mdToHtml(txt); show(docCache[file]); })
+    .catch(e => {
+      body.innerHTML = '<p>' + escHtml('Das Dokument konnte nicht geladen werden.') + '</p><pre>'   // scan-ok: escaped
+                     + escHtml(file + ': ' + (e && e.message ? e.message : e)) + '</pre>';
+    });
+}
+
+function wireDocViewer() {
+  document.addEventListener('click', e => {
+    if (!e.target.closest) return;
+    const jump = e.target.closest('[data-anchor]');
+    if (jump) {
+      e.preventDefault();
+      const body = $('doc-body');
+      const target = body && body.querySelector('#' + CSS.escape(jump.getAttribute('data-anchor')));
+      if (target) body.scrollTop = target.offsetTop - body.offsetTop;
+      return;
+    }
+    const a = e.target.closest('[data-doc], [data-docfile]');
+    if (!a) return;
+    e.preventDefault();
+    const file = a.getAttribute('data-docfile');
+    if (file) openDocFile(file); else openDoc(a.getAttribute('data-doc'));
+  });
+  ['doc-x', 'doc-close'].forEach(id => {
+    const b = $(id);
+    if (b) b.addEventListener('click', () => { const d = $('doc'); if (d) d.close(); });
+  });
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -1030,10 +1225,9 @@ window.addEventListener('DOMContentLoaded', () => {
   const missing = REQUIRED_IDS.filter(id => !$(id));
   if (pageBuild !== BUILD || missing.length) {
     if ($('status')) setStatus('disconnected', 'Seite veraltet');
-    log('ACHTUNG: Markup ist ' + pageBuild + ', Skript ist ' + BUILD + '.');
-    if (missing.length) log('Es fehlen diese Elemente: ' + missing.join(', '));
-    log('Seite und Skript passen nicht zusammen. Was du siehst, ist aelter als das,');
-    log('was die Fussleiste behauptet. Die Fussleiste kommt naemlich aus dem Skript.');
+    log('WARNING: markup is ' + pageBuild + ', script is ' + BUILD, 'log-err');
+    if (missing.length) log('missing elements: ' + missing.join(', '), 'log-err');
+    log('page and script do not match; what you see is older than the footer build, which comes from the script', 'log-err');
   }
 
   $('build-ver').textContent = 'Build ' + BUILD;
@@ -1044,7 +1238,7 @@ window.addEventListener('DOMContentLoaded', () => {
   refreshOrigUi();
 
   log('Blade-Test ' + BUILD);
-  if (!navigator.bluetooth) log('Kein Web Bluetooth in diesem Browser. Auf iOS Bluefy nutzen.');
+  if (!navigator.bluetooth) log('no Web Bluetooth in this browser; use Bluefy on iOS', 'log-err');
 
   on('btn-conn', 'click', () => {
     if (device && device.gatt && device.gatt.connected) disconnect(); else pickAndConnect();
@@ -1068,34 +1262,42 @@ window.addEventListener('DOMContentLoaded', () => {
   on('btn-probe-copy', 'click', async () => {
     try {
       await navigator.clipboard.writeText($('probe-out').textContent);
-      log('Protokoll in die Zwischenablage gelegt');
+      log('report copied to clipboard', 'log-ok');
     } catch (e) {
-      log('Kopieren ging nicht, den Text bitte von Hand markieren');
+      log('copy failed; select the text by hand', 'log-err');
     }
   });
 
   on('btn-set', 'click', () => writeName($('fin-in').value.trim()));
   on('btn-restore', 'click', () => {
-    if (!originalName) { log('keine urspruengliche FIN gemerkt'); return; }
+    if (!originalName) { log('no original FIN remembered', 'log-err'); return; }
     writeName(originalName);
   });
   on('btn-forget', 'click', forgetOriginal);
   on('btn-prof-copy', 'click', async () => {
     try {
       await navigator.clipboard.writeText($('prof-out').textContent);
-      log('Steckbrief in die Zwischenablage gelegt');
+      log('profile copied to clipboard', 'log-ok');
     } catch (e) {
-      log('Kopieren ging nicht, den Text bitte von Hand markieren');
+      log('copy failed; select the text by hand', 'log-err');
     }
   });
   on('btn-inv-copy', 'click', async () => {
     try {
       await navigator.clipboard.writeText($('inv-out').textContent);
-      log('Inventar in die Zwischenablage gelegt');
+      log('inventory copied to clipboard', 'log-ok');
     } catch (e) {
-      log('Kopieren ging nicht, den Text bitte von Hand markieren');
+      log('copy failed; select the text by hand', 'log-err');
     }
   });
+
+  // Log controls (public-log toggle default-on, diagnostics off, copy / clear / save).
+  { const pl = $('public-log'); if (pl) { publicLog = pl.checked; pl.addEventListener('change', () => { publicLog = pl.checked; renderLog(); }); } }
+  { const dl = $('diag-log'); if (dl) { diagLog = dl.checked; dl.addEventListener('change', () => { diagLog = dl.checked; log(diagLog ? 'diagnostics on' : 'diagnostics off', 'log-rx'); }); } }
+  on('btn-copy-log', 'click', copyLog);
+  on('btn-clear-log', 'click', clearLog);
+  on('btn-save-log', 'click', saveLog);
+  wireDocViewer();
 
   on('btn-req-info', 'click', () => requestAssemblies());
   on('btn-unlock-auto', 'click', () => sendCruise(1));
