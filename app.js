@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v27';
+const BUILD = 'v28';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -171,11 +171,12 @@ function saveLog() {
   } catch (e) { log('save failed: ' + (e && e.message ? e.message : e), 'log-err'); }
 }
 
-function setStatus(state, text) {
+function setStatus(state, key) {
   const el = $('status');
   if (!el) return;
   el.dataset.state = state;
-  el.textContent = text;
+  el.setAttribute('data-t', key);   // a language switch re-localizes the status via applyLang
+  el.textContent = t(key);
 }
 
 // ── CRC-8, poly 0x07, the exact port ─────────────────────────────────────────
@@ -935,7 +936,7 @@ function onDisconnected() {
   writeChar = null;
   writeUuid = null;
   notifyUuids = [];
-  setStatus('disconnected', t('stDisconnected'));
+  setStatus('disconnected', 'stDisconnected');
   $('btn-conn').textContent = t('btnConnect');
   $('fin-in').disabled = true;
   $('btn-set').disabled = true;
@@ -953,7 +954,7 @@ async function pickAndConnect() {
     return;
   }
   try {
-    setStatus('linking', t('stChoosing'));
+    setStatus('linking', 'stChoosing');
     // The chooser is narrowed to a scooter identity, TDE... or T1DE..., so the list
     // stays readable. Nothing beyond the name is checked: the write itself never
     // asks which model this is.
@@ -962,7 +963,7 @@ async function pickAndConnect() {
       optionalServices: OPTIONAL_SERVICES,
     });
   } catch (e) {
-    setStatus('disconnected', t('stDisconnected'));
+    setStatus('disconnected', 'stDisconnected');
     log('chooser cancelled');
     return;
   }
@@ -971,7 +972,7 @@ async function pickAndConnect() {
 
 async function connectTo(dev) {
   try {
-    setStatus('linking', t('stConnecting'));
+    setStatus('linking', 'stConnecting');
     rxCount = 0;
     rxLastUuid = null;
     resetInventory();
@@ -1053,7 +1054,7 @@ async function connectTo(dev) {
 
     buildProfile(services).catch(e => log('device profile incomplete: ' + (e && e.message ? e.message : e), 'log-err'));
 
-    setStatus('connected', t('stConnected'));
+    setStatus('connected', 'stConnected');
     $('btn-conn').textContent = t('btnDisconnect');
     $('fin-in').disabled = false;
     $('fin-in').placeholder = t('finPhConnected');
@@ -1069,7 +1070,7 @@ async function connectTo(dev) {
     }, CONNECT_CODE_INTERVAL_MS);
   } catch (e) {
     log('connect failed: ' + (e && e.message ? e.message : e), 'log-err');
-    setStatus('disconnected', t('stDisconnected'));
+    setStatus('disconnected', 'stDisconnected');
   }
 }
 
@@ -1096,12 +1097,12 @@ function validate(name) {
 async function writeName(name) {
   const bad = validate(name);
   if (bad) { log('rejected: ' + bad, 'log-err'); return; }
-  setStatus('writing', t('stWriting'));
+  setStatus('writing', 'stWriting');
   log('writing FIN ' + sens(name), 'log-tx');
   await send(setDeviceNameFrame(name), 'FIN write');
   log('written; the controller stores it in EEPROM and hands it to the Bluetooth module');
   log('the link drops on write; reconnect once afterwards');
-  if (device && device.gatt.connected) setStatus('connected', t('stConnected'));
+  if (device && device.gatt.connected) setStatus('connected', 'stConnected');
 }
 
 // ── document viewer (trbm-unlock model) ──────────────────────────────────────
@@ -1239,7 +1240,7 @@ window.addEventListener('DOMContentLoaded', () => {
   initLangSwitch();
   applyLang();
   initTheme();
-  setStatus('disconnected', t('stDisconnected'));
+  setStatus('disconnected', 'stDisconnected');
 
   // First thing, before anything can throw on a missing element. The build number in
   // the footer comes from this file, and this file is always fetched fresh because its
@@ -1249,7 +1250,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const pageBuild = (document.body.dataset && document.body.dataset.build) || t('buildNotSpecified');
   const missing = REQUIRED_IDS.filter(id => !$(id));
   if (pageBuild !== BUILD || missing.length) {
-    if ($('status')) setStatus('disconnected', t('stStale'));
+    if ($('status')) setStatus('disconnected', 'stStale');
     log('WARNING: markup is ' + pageBuild + ', script is ' + BUILD, 'log-err');
     if (missing.length) log('missing elements: ' + missing.join(', '), 'log-err');
     log('page and script do not match; what you see is older than the footer build, which comes from the script', 'log-err');
