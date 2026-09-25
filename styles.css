@@ -130,15 +130,12 @@ pre#log {
 }
 
 /* Links wrap freely; the build stamp sits to the right, the copyright on its own line. */
-.foot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; padding: 4px 0 2px; }
-.foot-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.foot { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 2px; }
+.foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; }
 .foot a { color: var(--accent); font-size: 12px; text-decoration: none; }
 .foot a:hover { text-decoration: underline; }
-.foot .ver { color: var(--muted); font-size: 12px; margin-left: auto; white-space: nowrap; }
-.foot .ver a { color: var(--muted); }
-.foot .ver a:hover { color: var(--accent); }
-.foot-copy { flex: 1 1 100%; color: var(--muted); font-size: 12px; text-decoration: none; }
-.foot-copy:hover { color: var(--accent); }
+.foot .ver { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.foot-copy { color: var(--accent); font-size: 12px; text-decoration: none; }
 
 /* Document viewer. Only the open dialog is a flex column; a display value on the closed
    one would beat display:none and drop it into the page. */

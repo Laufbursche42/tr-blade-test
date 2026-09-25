@@ -8,12 +8,12 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Laufbursche Blade-Test</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg?v=1">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=1">
-<link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png?v=1">
-<link rel="stylesheet" href="styles.css?v=17">
+<link rel="icon" type="image/svg+xml" href="favicon.svg?v=23">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=23">
+<link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png?v=23">
+<link rel="stylesheet" href="styles.css?v=23">
 </head>
-<body data-build="v22">
+<body data-build="v23">
 <div class="wrap">
   <header>
     <h1>Laufbursche <span>Blade-Test</span></h1>
@@ -22,12 +22,11 @@
     </div>
   </header>
 
-  <p class="banner" role="note"><b>Testwerkzeug, kein Tuning-Werkzeug.</b> Dies ist eine Machbarkeitsstudie, kein fertiges Produkt: Fehlerfreier Betrieb wird nicht versprochen, es gibt keinerlei Gewährleistung, und alles, was du hier tust, tust du auf eigenes Risiko (<a href="#" data-doc="DISCLAIMER">Haftungsausschluss</a>). Die Seite tunt, entdrosselt oder entsperrt keinen Scooter. Sie schreibt nur die Geräte-Identität - die FIN, also den Bluetooth-Namen, den der Scooter ausstrahlt - und prüft, ob einzelne Baugruppen hinter der Bluetooth-Verbindung erreichbar sind. Die FIN zu ändern schaltet nichts frei: auf einer Laufbursche-Firmware hängt die Drossel am Bluetooth-Schloss, nicht am Namen.</p>
-
   <div class="card">
     <h2>Wozu das hier ist</h2>
     <p class="hint">Verbinden und die FIN des Scooters schreiben, nichts weiter. Die Liste zeigt Geräte, deren Name mit <b>TDE</b>, <b>T1</b> oder <b>TEU</b> beginnt. Geprüft wird der Anfang, also sind <b>TDE1</b>, <b>T1DE</b> und <b>TEU1</b> ebenfalls dabei. Welches Modell dahinter steckt, fragt diese Seite nicht.</p>
     <p class="hint">Die FIN ist der Bluetooth-Name des Scooters. Sie landet im EEPROM der Steuerung und überlebt den Neustart. Schreib dir den ursprünglichen Wert auf, bevor du ihn änderst.</p>
+    <p class="warn"><b>Machbarkeitsstudie:</b> Diese Seite zeigt, was das Bluetooth-Protokoll eines Trittbrett-Scooters technisch möglich macht, sie ist kein fertiges Produkt. Fehlerfreier Betrieb wird nicht versprochen, es gibt keinerlei Gewährleistung. Alles, was du hier tust, tust du auf eigenes Risiko. <a href="#" data-doc="DISCLAIMER">Haftungsausschluss lesen</a>. Probleme oder Fehler beim Testen bitte per DM an Laufbursche im escooter-stammtisch oder als GitHub-Issue melden. Dieses Werkzeug tunt, entdrosselt oder entsperrt nichts: es schreibt nur die Geräte-Identität (die FIN, also den Bluetooth-Namen) und prüft, ob Baugruppen hinter der Bluetooth-Verbindung erreichbar sind. Die FIN zu ändern schaltet nichts frei, denn auf einer Laufbursche-Firmware hängt die Drossel am Bluetooth-Schloss, nicht am Namen.</p>
   </div>
 
   <div class="card">
@@ -154,14 +153,14 @@
   <footer class="foot">
     <span class="foot-links">
       <a href="#" data-doc="GUIDE">Anleitung</a>
-      <a href="#" data-doc="README">Readme</a>
-      <a href="#" data-doc="PRIVACY">Datenschutz</a>
-      <a href="#" data-doc="LICENSE">Lizenz</a>
-      <a href="#" data-doc="TRADEMARKS">Marken</a>
-      <a href="#" data-doc="DISCLAIMER">Haftungsausschluss</a>
       <a href="https://github.com/Laufbursche42/tr-blade-test" target="_blank" rel="noopener">Quellcode</a>
+      <a href="#" data-doc="README">Readme</a>
+      <a href="#" data-doc="DISCLAIMER">Haftungsausschluss</a>
+      <a href="#" data-doc="LICENSE">Lizenz</a>
+      <a href="#" data-doc="PRIVACY">Datenschutz</a>
+      <a href="#" data-doc="TRADEMARKS">Marken</a>
     </span>
-    <span class="ver"><span id="build-ver"></span> - <a href="https://github.com/Laufbursche42/tr-blade-test/issues" target="_blank" rel="noopener">Problem melden</a></span>
+    <span class="ver" id="build-ver"></span>
     <a class="foot-copy" href="https://laufbursche42.github.io/Laufbursche42/" target="_blank" rel="noopener">Copyright (c) 2026 Laufbursche</a>
   </footer>
 </div>
@@ -177,6 +176,6 @@
   </div>
 </dialog>
 
-<script src="app.js?v=17"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>

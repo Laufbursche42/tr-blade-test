@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v22';
+const BUILD = 'v23';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
