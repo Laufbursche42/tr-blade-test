@@ -9,6 +9,8 @@ window.I18N = {
   de: {
     brandSub: "Blade-Test",
     langGroup: "Sprache",
+    themeToLight: "Auf helle Darstellung umschalten",
+    themeToDark: "Auf dunkle Darstellung umschalten",
 
     s1Title: "Wozu das hier ist",
     about1: "Verbinden und die FIN des Scooters schreiben, nichts weiter. Die Liste zeigt Geräte, deren Name mit <b>TDE</b>, <b>T1</b> oder <b>TEU</b> beginnt. Geprüft wird der Anfang, also sind <b>TDE1</b>, <b>T1DE</b> und <b>TEU1</b> ebenfalls dabei. Welches Modell dahinter steckt, fragt diese Seite nicht.",
@@ -113,6 +115,8 @@ window.I18N = {
   en: {
     brandSub: "Blade-Test",
     langGroup: "Language",
+    themeToLight: "Switch to light theme",
+    themeToDark: "Switch to dark theme",
 
     s1Title: "What this is for",
     about1: "Connect and write the scooter's FIN, nothing more. The list shows devices whose name starts with <b>TDE</b>, <b>T1</b> or <b>TEU</b>. The start is checked, so <b>TDE1</b>, <b>T1DE</b> and <b>TEU1</b> are included too. This page does not ask which model is behind it.",
@@ -237,6 +241,8 @@ function applyLang() {
   });
   { const el = document.getElementById('langs'); if (el) el.setAttribute('aria-label', t('langGroup')); }
   document.querySelectorAll('#langs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+  // Theme button label follows the current theme and language.
+  { const dark = document.documentElement.getAttribute('data-theme') !== 'light'; const el = document.getElementById('btn-theme'); if (el) { el.setAttribute('aria-label', t(dark ? 'themeToLight' : 'themeToDark')); el.title = el.getAttribute('aria-label'); } }
 }
 
 function initLangSwitch() {

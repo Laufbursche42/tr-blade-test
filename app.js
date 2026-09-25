@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v25';
+const BUILD = 'v26';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -43,6 +43,7 @@ const NAME_PREFIXES = ['TDE', 'T1', 'TEU'];
 const CONNECT_CODE_INTERVAL_MS = 6500;   // the app's keep-alive spacing
 const WRITE_GAP_MS = 200;                // the app's spacing between two frames
 const LS_ORIG = 'fintest_orig_name';
+const LS_THEME = 'fintest_theme';
 
 let device = null;
 let deviceId = '';     // raw BLE device id, redacted out of the public log
@@ -76,7 +77,24 @@ const REQUIRED_IDS = ['status', 'log', 'frame', 'build-ver', 'dev-name', 'svc-na
   'prof-out', 'btn-prof-copy', 'inv-out', 'btn-inv-copy',
   'btn-unlock-auto', 'btn-unlock-man', 'btn-lock', 'btn-req-info',
   'probe-node', 'btn-probe', 'btn-probe-all', 'btn-probe-copy', 'probe-out',
-  'public-log', 'diag-log', 'btn-copy-log', 'btn-clear-log', 'btn-save-log'];
+  'public-log', 'diag-log', 'btn-copy-log', 'btn-clear-log', 'btn-save-log', 'btn-theme'];
+
+// ── theme (dark default; light switched in by data-theme on <html>) ───────────
+// applyTheme sets data-theme, swaps the button glyph (sun in dark, moon in light) and its
+// label via t(), then persists the choice. Stored theme wins; otherwise dark is the default.
+function applyTheme(dark) {
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  const b = $('btn-theme');
+  if (b) { b.innerHTML = dark ? '&#9728;' : '&#9790;'; b.setAttribute('aria-label', t(dark ? 'themeToLight' : 'themeToDark')); b.title = b.getAttribute('aria-label'); }   // scan-ok: a fixed character, not user input
+  try { localStorage.setItem(LS_THEME, dark ? 'dark' : 'light'); } catch (e) {}
+}
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem(LS_THEME); } catch (e) {}
+  applyTheme(saved !== 'light');
+  const b = $('btn-theme');
+  if (b) b.addEventListener('click', () => { applyTheme(document.documentElement.getAttribute('data-theme') === 'light'); });
+}
 
 // ── log panel (lb-tool-web model) ────────────────────────────────────────────
 // Timestamped, appended newest-at-bottom with autoscroll, coloured TX/RX/ok/err, buffered so a
@@ -1221,6 +1239,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // override it. Node options get a second applyLang() once they are built.
   initLangSwitch();
   applyLang();
+  initTheme();
   setStatus('disconnected', t('stDisconnected'));
 
   // First thing, before anything can throw on a missing element. The build number in
