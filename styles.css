@@ -87,6 +87,7 @@ label { color: var(--label); font-size: 12px; text-transform: uppercase; letter-
 .hint b { color: var(--label); }
 .mono { font-family: var(--mono); font-size: 13px; color: var(--label); word-break: break-all; }
 .mono span { color: var(--text); }
+.hint a, .warn a { color: var(--accent); }
 .warn {
   color: var(--warn); font-size: 12px; background: #FFAA1814; border: 1px solid #FFAA1840;
   border-radius: 8px; padding: 9px 11px; margin: 0;
