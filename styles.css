@@ -41,6 +41,13 @@ h1 span { color: var(--accent); }
 .status[data-state="disconnected"] { color: var(--bad); border-color: #3a2030; }
 .status[data-state="linking"], .status[data-state="writing"] { color: var(--warn); border-color: #3a3020; }
 
+/* Prominent top notice: this is a test tool, not a tuning tool. */
+.banner {
+  background: #B8F0201a; border: 1px solid var(--accent); border-radius: 12px;
+  padding: 12px 14px; color: var(--label); font-size: 13px; line-height: 1.5; margin: 0;
+}
+.banner b { color: var(--accent); }
+
 .card {
   background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
   display: flex; flex-direction: column; gap: 12px;

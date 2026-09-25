@@ -1,18 +1,46 @@
-# OS
+# --- OS clutter ---
 Thumbs.db
+ehthumbs.db
+desktop.ini
 .DS_Store
-# IDE
+.DS_Store?
+._*
+
+# --- Editors / IDEs ---
 .idea/
 *.iml
 .vscode/
-# Secrets, never commit
+*.swp
+*.swo
+*~
+
+# --- Dev tooling only (nothing here is shipped) ---
+node_modules/
+npm-debug.log*
+
+# --- Python (local runs of scripts/security-scan.py) ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# --- Secrets / local state: never commit ---
+.env
+.env.local
+.env.*.local
 *.pem
 *.jks
 *.p12
 *.keystore
-.env
 secrets.*
 token.txt
-# Firmware never belongs in this repository
+
+# --- Firmware never belongs in this repository ---
 *.hex
 *.bin
+
+# --- Logs / temp ---
+*.log
+*.tmp

@@ -6,6 +6,8 @@ A one-page test tool. It connects to a scooter over Web Bluetooth and writes the
 
 **Model-independent on purpose.** The chooser lists devices whose advertised name starts with `TDE`, `T1` or `TEU`, which also covers `TDE1`, `T1DE` and `TEU1`, which is a scooter identity and nothing beyond that name is checked. There is no model gate, so the identity write can be tried on a scooter the app does not know.
 
+> **Not a tuning tool.** This page does not tune, derestrict or unlock any scooter. It only writes the device identity (the FIN, i.e. the advertised BLE name) and tests whether assemblies are reachable behind the Bluetooth link. Changing the FIN unlocks nothing: on a Laufbursche firmware the speed clamp hangs off the live Bluetooth lock, not off the name.
+
 ## What it does
 
 - connect and disconnect, with the handshake and the keep-alive the app sends. The chooser is filtered to a name starting with `TDE`, `T1` or `TEU`
