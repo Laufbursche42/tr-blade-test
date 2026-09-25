@@ -48,19 +48,19 @@
 
   <div class="card">
     <h2>Sperr-Test: gesperrt gegen entsperrt aufnehmen</h2>
-    <p class="hint">Das hier ist der eigentliche Test. Ziel: herausfinden, an welchem <b>Byte</b> der Scooter dauerhaft anzeigt, ob er gedrosselt (22) oder frei (65) ist. Der Tempomat taugt dafuer nicht, weil er am Blade sofort wieder auf Aus springt. Es wird <b>nichts gesendet</b>, die Seite liest nur mit.</p>
+    <p class="hint">Das hier ist der eigentliche Test. Ziel: herausfinden, an welchem <b>Byte</b> der Scooter dauerhaft anzeigt, ob er gedrosselt (22) oder frei (65) ist. Der Tempomat taugt dafür nicht, weil er am Blade sofort wieder auf Aus springt. Es wird <b>nichts gesendet</b>, die Seite liest nur mit.</p>
     <ol class="hint">
       <li><b>Verbinden</b> (Karte oben). Ein paar Sekunden streamen lassen.</li>
-      <li>Scooter in den <b>gesperrten</b> Zustand bringen (22). Rund 10 Sekunden warten, damit <span class="mono">55 71</span> sicher durchlaeuft.</li>
+      <li>Scooter in den <b>gesperrten</b> Zustand bringen (22). Rund 10 Sekunden warten, damit <span class="mono">55 71</span> sicher durchläuft.</li>
       <li>Scooter mit deiner bisher funktionierenden Methode <b>entsperren</b> (65). Wieder rund 10 Sekunden warten.</li>
       <li>Unten auf <b>Inventar kopieren</b> tippen und mir den ganzen Text schicken.</li>
     </ol>
-    <p class="hint">Weil die Seite <b>jede abweichende Ausprägung</b> eines Rahmens einzeln behaelt, hat <span class="mono">55 71</span> danach zwei Ausprägungen (gesperrt und entsperrt). Die neue Zeile <b>DIFF ueber Ausprägungen</b> zeigt dann genau das Byte, das sich unterscheidet und bleibt. Beachte besonders <span class="mono">Byte17 Systemstatus</span>, <span class="mono">Bit6</span> und <span class="mono">Speed-Limit</span>. Achte darauf, waehrend der Aufnahme <b>nicht den Gang zu wechseln</b>, sonst aendert sich Byte3 mit.</p>
+    <p class="hint">Weil die Seite <b>jede abweichende Ausprägung</b> eines Rahmens einzeln behält, hat <span class="mono">55 71</span> danach zwei Ausprägungen (gesperrt und entsperrt). Die neue Zeile <b>DIFF über Ausprägungen</b> zeigt dann genau das Byte, das sich unterscheidet und bleibt. Beachte besonders <span class="mono">Byte17 Systemstatus</span>, <span class="mono">Bit6</span> und <span class="mono">Speed-Limit</span>. Achte darauf, während der Aufnahme <b>nicht den Gang zu wechseln</b>, sonst ändert sich Byte3 mit.</p>
   </div>
 
   <div class="card">
     <h2>Tempomat senden (entsperren/sperren auf dieser Seite)</h2>
-    <p class="warn">Bluetooth ist exklusiv: du kannst nicht gleichzeitig mit der Teverun-App verbunden sein. Darum senden diese Knoepfe den Tempomat-Befehl direkt von hier. Es geht der normale <span class="mono">0x18</span>-Einstellungsrahmen raus, alle uebrigen Werte werden aus dem letzten <span class="mono">55 71</span> unveraendert gespiegelt, nur der Tempomat aendert sich.</p>
+    <p class="warn">Bluetooth ist exklusiv: du kannst nicht gleichzeitig mit der Teverun-App verbunden sein. Darum senden diese Knöpfe den Tempomat-Befehl direkt von hier. Es geht der normale <span class="mono">0x18</span>-Einstellungsrahmen raus, alle übrigen Werte werden aus dem letzten <span class="mono">55 71</span> unverändert gespiegelt, nur der Tempomat ändert sich.</p>
     <div class="btns">
       <button class="primary" id="btn-unlock-auto" disabled>Entsperren: Tempomat auto (1)</button>
       <button id="btn-unlock-man" disabled>Entsperren: Tempomat manuell (2)</button>
@@ -71,7 +71,7 @@
 
   <div class="card">
     <h2>Baugruppen-Info anfordern (proType / proCode)</h2>
-    <p class="hint">Die Frames <span class="mono">55 44</span> (Display/Akku/Licht) und <span class="mono">55 45</span> (Motorcontroller = Blade-ESC) streamen nicht von selbst - sie sind Antworten auf eine Anforderung. Dieser Knopf sendet die Anforderungs-Frames; die Antworten erscheinen dann unten im Inventar mit proType und proCode. Damit finden wir den echten Firmware-Schluessel des Blade-ESC.</p>
+    <p class="hint">Die Frames <span class="mono">55 44</span> (Display/Akku/Licht) und <span class="mono">55 45</span> (Motorcontroller = Blade-ESC) streamen nicht von selbst - sie sind Antworten auf eine Anforderung. Dieser Knopf sendet die Anforderungs-Frames; die Antworten erscheinen dann unten im Inventar mit proType und proCode. Damit finden wir den echten Firmware-Schlüssel des Blade-ESC.</p>
     <div class="btns">
       <button class="primary span2" id="btn-req-info" disabled>Baugruppen-Info anfordern</button>
     </div>
