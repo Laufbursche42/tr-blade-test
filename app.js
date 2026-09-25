@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v26';
+const BUILD = 'v27';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -393,16 +393,17 @@ function send(bytes, what, viaChar) {
 // a read on an unknown vendor characteristic can have side effects, a read on
 // 180A cannot, it exists to be read.
 
+// Values are i18n keys, resolved with t() at render time so a language switch takes effect.
 const DIS_NAMES = {
-  '2a23': 'System-Kennung',
-  '2a24': 'Modellnummer',
-  '2a25': 'Seriennummer',
-  '2a26': 'Firmware-Stand',
-  '2a27': 'Hardware-Stand',
-  '2a28': 'Software-Stand',
-  '2a29': 'Hersteller',
-  '2a2a': 'Zulassungsdaten',
-  '2a50': 'PnP-Kennung',
+  '2a23': 'disSysId',
+  '2a24': 'disModel',
+  '2a25': 'disSerial',
+  '2a26': 'disFirmware',
+  '2a27': 'disHardware',
+  '2a28': 'disSoftware',
+  '2a29': 'disManuf',
+  '2a2a': 'disRegdata',
+  '2a50': 'disPnp',
 };
 
 const short = uuid => (uuid.startsWith('0000') && uuid.endsWith('-0000-1000-8000-00805f9b34fb'))
@@ -410,14 +411,14 @@ const short = uuid => (uuid.startsWith('0000') && uuid.endsWith('-0000-1000-8000
 
 function charProps(c) {
   const p = c.properties, out = [];
-  if (p.read) out.push('lesen');
-  if (p.write) out.push('schreiben');
-  if (p.writeWithoutResponse) out.push('schreiben ohne Antwort');
-  if (p.notify) out.push('melden');
-  if (p.indicate) out.push('anzeigen');
-  if (p.broadcast) out.push('rundsenden');
-  if (p.authenticatedSignedWrites) out.push('signiert schreiben');
-  return out.length ? out.join(', ') : 'keine';
+  if (p.read) out.push(t('cpRead'));
+  if (p.write) out.push(t('cpWrite'));
+  if (p.writeWithoutResponse) out.push(t('cpWriteNoResp'));
+  if (p.notify) out.push(t('cpNotify'));
+  if (p.indicate) out.push(t('cpIndicate'));
+  if (p.broadcast) out.push(t('cpBroadcast'));
+  if (p.authenticatedSignedWrites) out.push(t('cpSigned'));
+  return out.length ? out.join(', ') : t('lblNone');
 }
 
 function dvText(dv) {
@@ -433,24 +434,24 @@ function dvText(dv) {
 function pnpText(dv) {
   if (dv.byteLength < 7) return null;
   const src = dv.getUint8(0);
-  return 'Quelle ' + (src === 1 ? 'Bluetooth SIG' : src === 2 ? 'USB-IF' : src)
-       + ', Hersteller 0x' + dv.getUint16(1, true).toString(16).padStart(4, '0')
-       + ', Produkt 0x' + dv.getUint16(3, true).toString(16).padStart(4, '0')
-       + ', Fassung 0x' + dv.getUint16(5, true).toString(16).padStart(4, '0');
+  return t('pnpSource') + ' ' + (src === 1 ? 'Bluetooth SIG' : src === 2 ? 'USB-IF' : src)
+       + ', ' + t('pnpVendor') + ' 0x' + dv.getUint16(1, true).toString(16).padStart(4, '0')
+       + ', ' + t('pnpProduct') + ' 0x' + dv.getUint16(3, true).toString(16).padStart(4, '0')
+       + ', ' + t('pnpRevision') + ' 0x' + dv.getUint16(5, true).toString(16).padStart(4, '0');
 }
 
 async function buildProfile(services) {
   if (!$('prof-out')) { log('device-profile card missing from this page, see above', 'log-err'); return; }
   const lines = [];
-  lines.push('Laufbursche Geraetesteckbrief  Build ' + BUILD);
-  lines.push('FIN:      ' + ((device && device.name) || '-'));
-  lines.push('Dienste:  ' + services.length);
+  lines.push(t('profDumpTitle') + '  Build ' + BUILD);
+  lines.push('FIN:'.padEnd(10) + ((device && device.name) || '-'));
+  lines.push((t('profServices') + ':').padEnd(10) + services.length);
   for (const svc of services) {
     lines.push('');
-    lines.push('Dienst ' + short(svc.uuid));
+    lines.push(t('profService') + ' ' + short(svc.uuid));
     let chars;
     try { chars = await svc.getCharacteristics(); } catch (e) { chars = []; }
-    if (!chars.length) { lines.push('  keine Charakteristiken lesbar'); continue; }
+    if (!chars.length) { lines.push('  ' + t('profNoChars')); continue; }
     for (const c of chars) {
       lines.push('  ' + short(c.uuid) + '   ' + charProps(c));
       if (svc.uuid !== DIS_SERVICE || !c.properties.read) continue;
@@ -461,9 +462,9 @@ async function buildProfile(services) {
         val = (key === '2a50' ? pnpText(dv) : null) || dvText(dv) || hex(new Uint8Array(dv.buffer));
       } catch (e) {
         // Web Bluetooth refuses the serial number by design, that is not a fault.
-        val = '(nicht lesbar: ' + (e && e.name ? e.name : e) + ')';
+        val = '(' + t('profNotReadable') + ': ' + (e && e.name ? e.name : e) + ')';
       }
-      lines.push('      ' + (DIS_NAMES[key] || key) + ': ' + val);
+      lines.push('      ' + (t(DIS_NAMES[key]) || key) + ': ' + val);
     }
   }
   $('prof-out').textContent = lines.join('\n');
@@ -479,19 +480,20 @@ async function buildProfile(services) {
 // The light module is the odd one out: the app tests three bytes there, not four,
 // so each field checks exactly what the app checks.
 
+// label holds an i18n key, resolved with t() at render time.
 const INVENTORY = {
   0x44: [
-    { key: 'dis', label: 'Display',           type: 2,  code: 3,  ver: 4,  test: 4 },
-    { key: 'bat', label: 'Akku',              type: 8,  code: 9,  ver: 10, test: 4 },
-    { key: 'lc',  label: 'Lichtmodul',        type: 14, code: 15, ver: 16, test: 3 },
+    { key: 'dis', label: 'invDisplay',      type: 2,  code: 3,  ver: 4,  test: 4 },
+    { key: 'bat', label: 'invBattery',      type: 8,  code: 9,  ver: 10, test: 4 },
+    { key: 'lc',  label: 'invLightModule',  type: 14, code: 15, ver: 16, test: 3 },
   ],
   0x45: [
-    { key: 'rm',  label: 'Controller hinten', type: 2,  code: 3,  ver: 4,  test: 4 },
-    { key: 'fm',  label: 'Controller vorn',   type: 8,  code: 9,  ver: 10, test: 4 },
+    { key: 'rm',  label: 'invCtrlRear',     type: 2,  code: 3,  ver: 4,  test: 4 },
+    { key: 'fm',  label: 'invCtrlFront',    type: 8,  code: 9,  ver: 10, test: 4 },
   ],
   0x4D: [
-    { key: 'rr',  label: 'Controller hinten rechts', type: 2, code: 3, ver: 4,  test: 4 },
-    { key: 'rf',  label: 'Controller vorn rechts',   type: 8, code: 9, ver: 10, test: 4 },
+    { key: 'rr',  label: 'invCtrlRearRight',  type: 2, code: 3, ver: 4,  test: 4 },
+    { key: 'rf',  label: 'invCtrlFrontRight', type: 8, code: 9, ver: 10, test: 4 },
   ],
 };
 
@@ -503,77 +505,79 @@ const bits = b => b.toString(2).padStart(8, '0').split('').reverse();   // the a
 // The identity frames read their fields straight out of INVENTORY, so the raw view and
 // the summary above can never drift apart.
 function invFields(sub) {
-  return v => INVENTORY[sub].map(f => [f.label,
-    'Typ ' + v[f.type] + '  Code ' + v[f.code]
-    + '  Version ' + (invVersion(v, f.ver, f.test) || 'nicht gemeldet')]);
+  return v => INVENTORY[sub].map(f => [t(f.label),
+    t('lblType') + ' ' + v[f.type] + '  Code ' + v[f.code]
+    + '  Version ' + (invVersion(v, f.ver, f.test) || t('invNotReported'))]);
 }
 
+// Field labels come from t() at call time (renderInventory invokes the decoder); units and
+// raw hex stay literal.
 const DECODERS = {
-  0x41: v => [['Akku-Kennung als Text', invAscii(v, 2, 15) || '(nichts Druckbares)']],
-  0x42: v => [['Rahmennummer als Text', invAscii(v, 2, 17) || '(nichts Druckbares)']],
+  0x41: v => [[t('dAkkuText'), invAscii(v, 2, 15) || t('dNothingPrintable')]],
+  0x42: v => [[t('dFrameNoText'), invAscii(v, 2, 17) || t('dNothingPrintable')]],
   0x43: v => [['Software', v[2] + '.' + v[3] + '.' + v[4]],
               ['Hardware', v[6] + '.' + v[7] + '.' + v[8]],
               // The app logs byte 17 as "gearMode" and splits its two nibbles into a
               // gear range, but only applies that on ECU devices (app-service.js:37926).
-              ['Byte 16 bis 18', hex([v[16], v[17], v[18]])],
-              ['Gangbereich aus Byte 17', (v[17] & 15) + ' bis ' + ((v[17] >> 4) & 15)]],
-  0x52: v => [['Pack-Spannung', (0.1 * u16(v, 2)).toFixed(1) + ' V'],
-              ['Zellspannung', (0.1 * u16(v, 4)).toFixed(1) + ' V'],
-              ['Strom', (0.1 * u16(v, 6) - 1000).toFixed(1) + ' A'],
-              ['Ladestand', v[8] + ' %'],
-              ['Gesundheit', v[9] + ' %'],
+              [t('dByte16to18'), hex([v[16], v[17], v[18]])],
+              [t('dGearRange'), (v[17] & 15) + t('rangeTo') + ((v[17] >> 4) & 15)]],
+  0x52: v => [[t('dPackVolt'), (0.1 * u16(v, 2)).toFixed(1) + ' V'],
+              [t('dCellVolt'), (0.1 * u16(v, 4)).toFixed(1) + ' V'],
+              [t('dCurrent'), (0.1 * u16(v, 6) - 1000).toFixed(1) + ' A'],
+              [t('dCharge'), v[8] + ' %'],
+              [t('dHealth'), v[9] + ' %'],
               // The app reads seven sensors out of 10 to 16, plus two more at 17 and 18.
-              ['Temperaturen', [10, 11, 12, 13, 14, 15, 16, 17, 18]
+              [t('dTemps'), [10, 11, 12, 13, 14, 15, 16, 17, 18]
                 .map(i => v[i] - 40).join(' ') + ' C']],
-  0x71: v => [['Gang', String(v[3])],
-              ['Radgroesse', (0.1 * v[6]).toFixed(1) + ' Zoll'],
-              ['Speed-Limit (Byte11)', String(v[11])],
-              ['Speed per Gang (Byte10)', String(v[10])],
-              ['Strom vorn (Byte12)', String(v[12])],
-              ['Strom hinten (Byte13)', String(v[13])],
-              ['eABS/F-Start (Byte8)', hex([v[8]]) + ' (' + ((v[8] >> 4) & 15) + '/' + (v[8] & 15) + ')'],
-              ['eABS/R-Start (Byte9)', hex([v[9]]) + ' (' + ((v[9] >> 4) & 15) + '/' + (v[9] & 15) + ')'],
-              ['Polpaare', String(v[5])],
-              ['Pack-Spannung', String(v[15])],
-              ['Temperatur', String(v[7])],
-              ['Tempomat', String(parseInt(bits(v[4])[2] + bits(v[4])[1], 2))],
+  0x71: v => [[t('dGear'), String(v[3])],
+              [t('dWheelSize'), (0.1 * v[6]).toFixed(1) + t('unitInch')],
+              [t('dSpeedLimitB11'), String(v[11])],
+              [t('dSpeedPerGearB10'), String(v[10])],
+              [t('dCurrentFrontB12'), String(v[12])],
+              [t('dCurrentRearB13'), String(v[13])],
+              [t('dEabsFStartB8'), hex([v[8]]) + ' (' + ((v[8] >> 4) & 15) + '/' + (v[8] & 15) + ')'],
+              [t('dEabsRStartB9'), hex([v[9]]) + ' (' + ((v[9] >> 4) & 15) + '/' + (v[9] & 15) + ')'],
+              [t('dPolePairs'), String(v[5])],
+              [t('dPackVolt'), String(v[15])],
+              [t('dTemperature'), String(v[7])],
+              [t('dCruise'), String(parseInt(bits(v[4])[2] + bits(v[4])[1], 2))],
               ['ABS', bits(v[4])[3]],
-              ['Anfahrmodus', bits(v[4])[6]],
+              [t('dStartMode'), bits(v[4])[6]],
               ['Smart', bits(v[17])[4]],
-              ['Meilen', bits(v[17])[1]],
+              [t('dMiles'), bits(v[17])[1]],
               // Candidates for the persistent eKFV lock state (the cruise value falls back to off
               // right away on the Blade, so the full status bytes plus their individual bits are shown here):
-              ['Byte4 Steuerstatus', hex([v[4]]) + '  bits ' + bits(v[4]).join('')],
-              ['Byte17 Systemstatus', hex([v[17]]) + '  bits ' + bits(v[17]).join('')],
-              ['eKFV-Klemme? Byte17 Bit6', bits(v[17])[6]]],
-  0x72: v => [['Strom hinten', (0.1 * u16(v, 12)).toFixed(1) + ' A'],
-              ['Strom vorn', (0.1 * u16(v, 4)).toFixed(1) + ' A'],
-              ['Motortemperatur hinten', String(v[17])],
-              ['Motortemperatur vorn', String(v[9])]],
-  0x73: v => [['Schnitt', (0.1 * u16(v, 2)).toFixed(1) + ' km/h'],
-              ['Maximum', (0.1 * u16(v, 4)).toFixed(1) + ' km/h'],
-              ['Strecke', (0.1 * u16(v, 6)).toFixed(1) + ' km']],
+              [t('dByte4Ctrl'), hex([v[4]]) + '  bits ' + bits(v[4]).join('')],
+              [t('dByte17Sys'), hex([v[17]]) + '  bits ' + bits(v[17]).join('')],
+              [t('dEkfvClamp'), bits(v[17])[6]]],
+  0x72: v => [[t('dCurrentRear'), (0.1 * u16(v, 12)).toFixed(1) + ' A'],
+              [t('dCurrentFront'), (0.1 * u16(v, 4)).toFixed(1) + ' A'],
+              [t('dMotorTempRear'), String(v[17])],
+              [t('dMotorTempFront'), String(v[9])]],
+  0x73: v => [[t('dAvg'), (0.1 * u16(v, 2)).toFixed(1) + ' km/h'],
+              [t('dMax'), (0.1 * u16(v, 4)).toFixed(1) + ' km/h'],
+              [t('dDistance'), (0.1 * u16(v, 6)).toFixed(1) + ' km']],
   0x44: invFields(0x44),
   0x45: invFields(0x45),
   0x4D: invFields(0x4D),
   // The BMS frames live in the app's battery page, not its home page.
-  0x51: v => [['Zellen 1 bis 8', cells(v)]],
-  0x55: v => [['Zellen 9 bis 16', cells(v)]],
-  0x56: v => [['Zellen 17 bis 24', cells(v)]],
-  0x53: v => [['Relais', v[2] + ' ' + v[3] + ' ' + v[4]],
-              ['Lade-MOSFET', v[5] === 2 ? 'an' : 'aus (' + v[5] + ')'],
-              ['Entlade-MOSFET', v[6] === 2 ? 'an' : 'aus (' + v[6] + ')'],
-              ['Balancer', bits(v[7]).join('')],
-              ['Kapazitaet', u16(v, 8) + ' Ah'],
-              ['Kapazitaet ver2', u16(v, 10) + ' Ah'],
-              ['Ladezyklen', String(u16(v, 12))],
-              ['Zellenzahl', String(v[14])],
-              ['Zelle hoechste', u16(v, 15) + ' mV'],
-              ['Zelle niedrigste', u16(v, 17) + ' mV']],
+  0x51: v => [[t('dCells1'), cells(v)]],
+  0x55: v => [[t('dCells9'), cells(v)]],
+  0x56: v => [[t('dCells17'), cells(v)]],
+  0x53: v => [[t('dRelay'), v[2] + ' ' + v[3] + ' ' + v[4]],
+              [t('dChargeMosfet'), v[5] === 2 ? t('dOn') : t('dOff') + ' (' + v[5] + ')'],
+              [t('dDischargeMosfet'), v[6] === 2 ? t('dOn') : t('dOff') + ' (' + v[6] + ')'],
+              [t('dBalancer'), bits(v[7]).join('')],
+              [t('dCapacity'), u16(v, 8) + ' Ah'],
+              [t('dCapacityV2'), u16(v, 10) + ' Ah'],
+              [t('dChargeCycles'), String(u16(v, 12))],
+              [t('dCellCount'), String(v[14])],
+              [t('dCellHighest'), u16(v, 15) + ' mV'],
+              [t('dCellLowest'), u16(v, 17) + ' mV']],
   0x54: v => {
     const on = [];
-    for (let i = 2; i <= 18; i++) if (v[i] > 0) on.push('Feld ' + (i - 2) + ' = ' + v[i]);
-    return [['Warnungen', on.length ? on.join(', ') : 'keine']];
+    for (let i = 2; i <= 18; i++) if (v[i] > 0) on.push(t('dField') + ' ' + (i - 2) + ' = ' + v[i]);
+    return [[t('dWarnings'), on.length ? on.join(', ') : t('lblNone')]];
   },
 };
 
@@ -661,9 +665,9 @@ function renderInventory() {
   const lines = [];
   // Widen to a column but never cut a label short, a truncated name is unreadable.
   const pad = s => s.length >= 22 ? s + ' ' : (s + '                      ').slice(0, 22);
-  lines.push(pad('Rahmennummer:') + (inv.frameNo || '-'));
-  lines.push(pad('Akku-Kennung:') + (inv.batCode || '-'));
-  lines.push(pad('Hauptgeraet:') + 'Software ' + (inv.mainSw || '-')
+  lines.push(pad(t('invFrameNo') + ':') + (inv.frameNo || '-'));
+  lines.push(pad(t('invBatCode') + ':') + (inv.batCode || '-'));
+  lines.push(pad(t('invMainDevice') + ':') + 'Software ' + (inv.mainSw || '-')
              + '   Hardware ' + (inv.mainHw || '-'));
   lines.push('');
   const order = ['dis', 'bat', 'lc', 'rm', 'fm', 'rr', 'rf'];
@@ -672,32 +676,32 @@ function renderInventory() {
     const p = inv.parts[k];
     if (!p) continue;
     any = true;
-    lines.push(pad(p.label + ':') + (p.ver
-      ? 'Typ ' + p.type + '  Code ' + p.code + '  Version ' + p.ver
-      : 'nicht gemeldet'));
+    lines.push(pad(t(p.label) + ':') + (p.ver
+      ? t('lblType') + ' ' + p.type + '  Code ' + p.code + '  Version ' + p.ver
+      : t('invNotReported')));
   }
-  if (!any) lines.push('Noch keine Baugruppen gemeldet.');
+  if (!any) lines.push(t('invNoAssemblies'));
   const subs = Object.keys(invSeen).map(Number).sort((a, b) => a - b);
   if (subs.length) {
     lines.push('');
-    lines.push('Gesehene 55-Rahmen: ' + subs.map(s =>
+    lines.push(t('invSeenFrames') + ' ' + subs.map(s =>
       hex([s]) + ' x' + invSeen[s]).join(', '));
     lines.push('');
-    lines.push('Rahmen im Einzelnen, jede abweichende Ausprägung eigen');
+    lines.push(t('invFramesDetail'));
     for (const s of subs) {
       const variants = Object.keys(invVariants[s] || {});
       lines.push('');
-      lines.push('55 ' + hex([s]) + '   ' + invSeen[s] + ' mal, '
-                 + variants.length + (variants.length === 1 ? ' Ausprägung' : ' Ausprägungen')
-                 + (invDropped[s] ? ', ' + invDropped[s] + ' weitere nicht behalten' : ''));
+      lines.push('55 ' + hex([s]) + '   ' + invSeen[s] + ' ' + t('invTimes') + ', '
+                 + variants.length + ' ' + (variants.length === 1 ? t('invVariant') : t('invVariants'))
+                 + (invDropped[s] ? ', ' + invDropped[s] + ' ' + t('invMoreNotKept') : ''));
       const dec = DECODERS[s];
       for (const raw of variants) {
-        lines.push('  roh:  ' + raw + '   (' + invVariants[s][raw] + 'x)');
-        if (!dec) { lines.push('        Diesen Rahmen liest die App nicht aus.'); continue; }
+        lines.push('  ' + t('invRaw') + '  ' + raw + '   (' + invVariants[s][raw] + 'x)');
+        if (!dec) { lines.push('        ' + t('invAppNoDecode')); continue; }
         const bytes = raw.split(' ').map(h => parseInt(h, 16));
         let fields;
         try { fields = dec(bytes); } catch (e) { fields = null; }
-        if (!fields) { lines.push('        Auswertung fehlgeschlagen.'); continue; }
+        if (!fields) { lines.push('        ' + t('invDecodeFailed')); continue; }
         for (const f of fields) lines.push('        ' + pad(f[0] + ':') + f[1]);
       }
       // Byte diff across the variants: this is exactly where the persistent lock byte shows up.
@@ -713,7 +717,7 @@ function renderInventory() {
             diffs.push('B' + i + '=' + vals.map(x => (x === undefined ? '--' : hex([x]))).join('/'));
           }
         }
-        lines.push('  DIFF ueber Ausprägungen: ' + (diffs.length ? diffs.join('  ') : 'keine'));
+        lines.push('  ' + t('invDiff') + ' ' + (diffs.length ? diffs.join('  ') : t('lblNone')));
       }
     }
   }
@@ -736,13 +740,14 @@ const PROBE_PROJECT_CODE = 0x00;
 const PROBE_TIMEOUT_MS = 8000;
 const PROBE_RESEND_MS = 3000;   // the app's resend spacing for an unanswered handshake
 
-// key = the number the app's own picker carries, sent as that byte value.
+// id = the number the app's own picker carries, sent as that byte value. The display name
+// comes from t('nodeName' + id) at render time; text is only an internal fallback.
 const NODES = [
-  { id: 50, text: 'TFT-40 Display' },
-  { id: 60, text: 'LCD-43 Display' },
-  { id: 70, text: 'Lichtmodul' },
-  { id: 30, text: 'Controller hinten' },
-  { id: 31, text: 'Controller vorn' },
+  { id: 50, text: 'TFT-40 display' },
+  { id: 60, text: 'LCD-43 display' },
+  { id: 70, text: 'Light module' },
+  { id: 30, text: 'Rear controller' },
+  { id: 31, text: 'Front controller' },
   { id: 10, text: 'BMS' },
 ];
 
@@ -763,11 +768,12 @@ function handshakeFrame(nodeId, projectCode) {
   return out;
 }
 
+// [titleKey, noteKey], resolved with t() when a response is decoded.
 const PROBE_REASONS = {
-  0x01: ['Node existiert nicht', 'Die Gegenstelle spricht das Protokoll, kennt diese Baugruppe aber nicht.'],
-  0x02: ['Node kann kein Update', 'Die Baugruppe ist da, hat aber keinen Update-Weg.'],
-  0x03: ['Projektcode passt nicht', 'Die Baugruppe ist da UND kann geflasht werden. Genau das wollten wir wissen.'],
-  0x04: ['Nicht im Ruhezustand', 'Die Baugruppe ist da und antwortet, ist gerade aber beschaeftigt.'],
+  0x01: ['pr01Title', 'pr01Note'],
+  0x02: ['pr02Title', 'pr02Note'],
+  0x03: ['pr03Title', 'pr03Note'],
+  0x04: ['pr04Title', 'pr04Note'],
 };
 
 // Returns null if this is not an answer to our question.
@@ -776,25 +782,22 @@ function decodeHandshakeResp(v) {
   if (v[1] !== HANDSHAKE_ID[0] || v[2] !== 0xEA) return null;
   const body = [];
   for (let i = 1; i <= 10; i++) body.push(v[i]);
-  if (crc8(body, 10) !== v[11]) return { title: 'Antwort verworfen', note: 'CRC-8 der Antwort stimmt nicht.', ok: false };
+  if (crc8(body, 10) !== v[11]) return { title: t('hsRespDropped'), note: t('hsRespDroppedNote'), ok: false };
   if (v[3] === 0x01 && v[4] === 0xAA) {
-    return { title: 'Node akzeptiert', ok: true,
-             note: 'Die Baugruppe wuerde das Update jetzt annehmen. Diese Seite sendet nichts weiter.' };
+    return { title: t('hsNodeAccept'), ok: true, note: t('hsNodeAcceptNote') };
   }
   if (v[3] === 0x01 && v[4] === 0x55) {
     const r = PROBE_REASONS[v[5]];
-    if (r) return { title: r[0], note: r[1], ok: v[5] !== 0x01 };
-    return { title: 'Abgelehnt, Grund ' + hex([v[5]]), note: 'Grund steht nicht in der App.', ok: false };
+    if (r) return { title: t(r[0]), note: t(r[1]), ok: v[5] !== 0x01 };
+    return { title: t('hsRejectedTitle') + hex([v[5]]), note: t('hsRejectedNote'), ok: false };
   }
   if (v[3] === 0x02 && v[4] === 0xA5) {
-    return { title: 'Bestaetigung am Geraet noetig', ok: true,
-             note: 'Die Baugruppe ist da und will eine Freigabe. Diese Seite gibt keine.' };
+    return { title: t('hsConfirmNeeded'), ok: true, note: t('hsConfirmNeededNote') };
   }
   if (v[3] === 0x03) {
-    return { title: 'Fortschrittsmeldung ' + hex([v[4], v[5]]), ok: true,
-             note: 'Unerwartet auf eine reine Anfrage hin. Bitte melden.' };
+    return { title: t('hsProgress') + ' ' + hex([v[4], v[5]]), ok: true, note: t('hsProgressNote') };
   }
-  return { title: 'Unbekannte Antwort', note: 'Aufbau passt, Inhalt steht nicht in der App.', ok: true };
+  return { title: t('hsUnknown'), note: t('hsUnknownNote'), ok: true };
 }
 
 // Called from the notify handler. True means the frame was ours.
@@ -813,18 +816,16 @@ async function probeNode(node, viaChar) {
   const frame = handshakeFrame(node.id, PROBE_PROJECT_CODE);
   const sent = hex(frame);
   const rxBefore = rxCount;
-  log('probing node ' + node.id + ' (' + node.text + ')');
+  log('probing node ' + node.id + ' (' + t('nodeName' + node.id) + ')');
   const answer = new Promise(resolve => {
     const timer = setTimeout(() => {
       probeWaiting = null;
       const heard = rxCount - rxBefore;
       resolve({ node: node, sent: sent, got: null, via: null,
-                res: { title: 'Keine Antwort', ok: false,
+                res: { title: t('hsNoAnswer'), ok: false,
                        note: heard
-                         ? 'Es kamen waehrenddessen ' + heard + ' andere Rahmen an, der Meldekanal '
-                           + 'lebt also. Die Gegenstelle hat den Rahmen nur nicht beantwortet.'
-                         : 'Waehrenddessen kam ueberhaupt nichts an, auch keine Telemetrie. '
-                           + 'Das Schweigen sagt hier nichts ueber den Node-Weg aus.' } });
+                         ? t('hsHeardPre') + heard + t('hsHeardPost')
+                         : t('hsSilent') } });
     }, PROBE_TIMEOUT_MS);
     probeWaiting = { node: node, resolve: resolve, timer: timer, sent: sent };
   });
@@ -841,42 +842,40 @@ async function probeNode(node, viaChar) {
 function renderReport() {
   const lines = [];
   const n = (device && device.name) || '';
-  lines.push('Laufbursche Node-Abfrage  Build ' + BUILD);
-  lines.push('FIN:          ' + (n || '-'));
-  lines.push('Dienst:       ' + ($('svc-name').textContent || '-'));
-  lines.push('Schreiben:    ' + (writeChars.length
-    ? writeChars.map(c => c.uuid).join('\n              ') : (writeUuid || '-')));
-  lines.push('Melden:       ' + (notifyUuids.length ? notifyUuids.join('\n              ') : '-'));
-  lines.push('Empfangen:    ' + rxCount + ' Rahmen seit dem Verbinden'
-             + (rxLastUuid ? ', zuletzt ueber ' + rxLastUuid : ''));
-  lines.push('Projektcode:  ' + hex([PROBE_PROJECT_CODE]));
+  const lbl = key => (t(key) + ':').padEnd(14);
+  const indent = '\n' + ' '.repeat(14);
+  lines.push(t('rptTitle') + '  Build ' + BUILD);
+  lines.push('FIN:'.padEnd(14) + (n || '-'));
+  lines.push(lbl('rptService') + ($('svc-name').textContent || '-'));
+  lines.push(lbl('rptWrite') + (writeChars.length
+    ? writeChars.map(c => c.uuid).join(indent) : (writeUuid || '-')));
+  lines.push(lbl('rptNotify') + (notifyUuids.length ? notifyUuids.join(indent) : '-'));
+  lines.push(lbl('rptReceived') + rxCount + t('rptFramesSince')
+             + (rxLastUuid ? t('rptLastVia') + rxLastUuid : ''));
+  lines.push(lbl('rptProjectCode') + hex([PROBE_PROJECT_CODE]));
   lines.push('');
   let answered = 0;
+  const sub = key => '    ' + t(key).padEnd(11);
   for (const r of probeReport) {
-    lines.push(String(r.node.id).padStart(2, ' ') + '  ' + r.node.text);
-    lines.push('    gesendet:  ' + r.sent);
-    lines.push('    empfangen: ' + (r.got || '(nichts)'));
-    lines.push('    Ergebnis:  ' + r.res.title);
+    lines.push(String(r.node.id).padStart(2, ' ') + '  ' + t('nodeName' + r.node.id));
+    lines.push(sub('rptSent') + r.sent);
+    lines.push(sub('rptReceivedLine') + (r.got || t('rptNothing')));
+    lines.push(sub('rptResult') + r.res.title);
     lines.push('               ' + r.res.note);
-    if (r.via_write) lines.push('    geschrieben ueber: ' + r.via_write);
-    if (r.via) lines.push('    geantwortet ueber: ' + r.via);
+    if (r.via_write) lines.push('    ' + t('rptWrittenVia') + ' ' + r.via_write);
+    if (r.via) lines.push('    ' + t('rptAnsweredVia') + ' ' + r.via);
     if (r.got) answered++;
   }
   lines.push('');
   if (!probeReport.length) {
-    lines.push('Noch nichts abgefragt.');
+    lines.push(t('rptNothingQueried'));
   } else if (answered === 0 && rxCount === 0) {
-    lines.push('Kein Fazit moeglich. Seit dem Verbinden ist kein einziger Rahmen');
-    lines.push('hereingekommen, nicht einmal Telemetrie. Der Meldekanal ist damit');
-    lines.push('unbewiesen, und Schweigen auf die Anfragen beweist so gar nichts.');
+    lines.push(t('rptNoFrameConc'));
   } else if (answered === 0) {
-    lines.push('Fazit: keine einzige Antwort, obwohl ueber denselben Kanal sonst Rahmen');
-    lines.push('hereinkommen. Die Gegenstelle hinter Bluetooth kennt den Node-Weg also');
-    lines.push('nicht, jedenfalls nicht auf diesen Rahmen hin.');
+    lines.push(t('rptNoAnswerConc'));
   } else {
-    lines.push('Fazit: ' + answered + ' von ' + probeReport.length + ' Anfragen beantwortet.');
-    lines.push('Damit steht fest, dass die Gegenstelle hinter Bluetooth das Node-Protokoll');
-    lines.push('spricht. Welche Baugruppen dahinter haengen, steht oben Zeile fuer Zeile.');
+    lines.push(t('rptAnsweredPre') + answered + t('rptAnsweredMid') + probeReport.length + t('rptAnsweredPost'));
+    lines.push(t('rptAnsweredConc'));
   }
   $('probe-out').textContent = lines.join('\n');
   $('btn-probe-copy').disabled = !probeReport.length;
@@ -1081,15 +1080,15 @@ function disconnect() {
 }
 
 function validate(name) {
-  if (!name) return 'Die FIN darf nicht leer sein.';
-  if (name.length > 16) return 'Hoechstens 16 Zeichen.';
+  if (!name) return t('vFinEmpty');
+  if (name.length > 16) return t('vFinTooLong');
   for (const ch of name) {
     const c = ch.charCodeAt(0);
-    if (c < 0x20 || c > 0x7E) return 'Nur ASCII-Zeichen.';
+    if (c < 0x20 || c > 0x7E) return t('vFinAscii');
   }
   const first = name.charCodeAt(0);
   if (first < 0x30 || first > 0x7A) {
-    return 'Das erste Zeichen muss im Bereich 0x30 bis 0x7A liegen, die Steuerung lehnt es sonst ab.';
+    return t('vFinFirstChar');
   }
   return null;
 }
@@ -1247,7 +1246,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // address carries the version. index.html carries no version of its own, so it can be
   // older than the script while the footer still reads the new build. That looks exactly
   // like a feature that was never built, so it gets named instead of guessed at.
-  const pageBuild = (document.body.dataset && document.body.dataset.build) || '(keine Angabe)';
+  const pageBuild = (document.body.dataset && document.body.dataset.build) || t('buildNotSpecified');
   const missing = REQUIRED_IDS.filter(id => !$(id));
   if (pageBuild !== BUILD || missing.length) {
     if ($('status')) setStatus('disconnected', t('stStale'));
@@ -1274,7 +1273,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const o = document.createElement('option');
     o.value = String(n.id);
     o.setAttribute('data-t', 'node' + n.id);   // label injected by applyLang; the id prefix is part of the value
-    o.textContent = n.id + '  ' + n.text;       // fallback until applyLang runs
+    o.textContent = t('node' + n.id);           // localized immediately; applyLang keeps it in sync
     sel.appendChild(o);
   }
   renderReport();
