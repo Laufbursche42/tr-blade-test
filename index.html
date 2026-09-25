@@ -8,157 +8,163 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Laufbursche Blade-Test</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg?v=24">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=24">
-<link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png?v=24">
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="icon" type="image/svg+xml" href="favicon.svg?v=25">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=25">
+<link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png?v=25">
+<link rel="stylesheet" href="styles.css?v=25">
 </head>
-<body data-build="v24">
+<body data-build="v25">
 <div class="wrap">
   <header>
-    <h1>Laufbursche <span>Blade-Test</span></h1>
+    <h1>Laufbursche <span data-t="brandSub">Blade-Test</span></h1>
     <div class="head-right">
       <span class="status" id="status" data-state="disconnected">getrennt</span>
+      <div class="head-tools">
+        <div class="langs" id="langs" role="group">
+          <button type="button" data-lang="de" aria-pressed="true">DE</button>
+          <button type="button" data-lang="en" aria-pressed="false">EN</button>
+        </div>
+      </div>
     </div>
   </header>
 
   <div class="card">
-    <h2>Wozu das hier ist</h2>
-    <p class="hint">Verbinden und die FIN des Scooters schreiben, nichts weiter. Die Liste zeigt Geräte, deren Name mit <b>TDE</b>, <b>T1</b> oder <b>TEU</b> beginnt. Geprüft wird der Anfang, also sind <b>TDE1</b>, <b>T1DE</b> und <b>TEU1</b> ebenfalls dabei. Welches Modell dahinter steckt, fragt diese Seite nicht.</p>
-    <p class="hint">Die FIN ist der Bluetooth-Name des Scooters. Sie landet im EEPROM der Steuerung und überlebt den Neustart. Schreib dir den ursprünglichen Wert auf, bevor du ihn änderst.</p>
-    <p class="warn"><b>Machbarkeitsstudie:</b> Diese Seite zeigt, was das Bluetooth-Protokoll eines Trittbrett-Scooters technisch möglich macht, sie ist kein fertiges Produkt. Fehlerfreier Betrieb wird nicht versprochen, es gibt keinerlei Gewährleistung. Alles, was du hier tust, tust du auf eigenes Risiko. <a href="#" data-doc="DISCLAIMER">Haftungsausschluss lesen</a>. Probleme oder Fehler beim Testen bitte per DM an Laufbursche im escooter-stammtisch oder als GitHub-Issue melden. Dieses Werkzeug tunt, entdrosselt oder entsperrt nichts: es schreibt nur die Geräte-Identität (die FIN, also den Bluetooth-Namen) und prüft, ob Baugruppen hinter der Bluetooth-Verbindung erreichbar sind. Die FIN zu ändern schaltet nichts frei, denn auf einer Laufbursche-Firmware hängt die Drossel am Bluetooth-Schloss, nicht am Namen.</p>
+    <h2 data-t="s1Title"></h2>
+    <p class="hint" data-t="about1"></p>
+    <p class="hint" data-t="about2"></p>
+    <p class="warn" data-t="about3"></p>
   </div>
 
   <div class="card">
-    <h2>Verbindung</h2>
+    <h2 data-t="connTitle"></h2>
     <div class="btns">
-      <button class="primary span2" id="btn-conn">Verbinden</button>
+      <button class="primary span2" id="btn-conn" data-t="btnConnect"></button>
     </div>
-    <div class="row"><span class="mono">Gerät: <span id="dev-name">-</span></span></div>
-    <div class="row"><span class="mono">Dienst: <span id="svc-name">-</span></span></div>
-    <p class="hint">Läuft in Chrome auf Android oder am Rechner und in Bluefy auf iOS. Safari hat kein Web Bluetooth.</p>
+    <div class="row"><span class="mono"><span data-t="lblDevice"></span> <span id="dev-name">-</span></span></div>
+    <div class="row"><span class="mono"><span data-t="lblService"></span> <span id="svc-name">-</span></span></div>
+    <p class="hint" data-t="connHint"></p>
   </div>
 
   <div class="card">
-    <h2>Gerätesteckbrief</h2>
-    <p class="hint">Was das Bluetooth-Modul selbst über sich verrät: alle angebotenen Dienste, alle Charakteristiken mit ihren Fähigkeiten, dazu der genormte Geräteinformations-Dienst <span class="mono">180A</span> im Klartext, also Hersteller, Modell und Stände. Füllt sich beim Verbinden von selbst.</p>
+    <h2 data-t="profTitle"></h2>
+    <p class="hint" data-t="profHint1"></p>
     <pre class="copy" id="prof-out">-</pre>
-    <p class="hint">Gelesen wird ausschließlich aus <span class="mono">180A</span>, denn dieser Dienst ist genau dafür da. Von unbekannten Hersteller-Charakteristiken wird nichts gelesen, weil ein Lesezugriff dort etwas auslösen könnte. Die Seriennummer sperrt der Browser von sich aus, das ist kein Fehler.</p>
+    <p class="hint" data-t="profHint2"></p>
     <div class="row">
-      <button id="btn-prof-copy" disabled>Steckbrief kopieren</button>
+      <button id="btn-prof-copy" data-t="btnProfCopy" disabled></button>
     </div>
   </div>
 
   <div class="card">
-    <h2>Sperr-Test: gesperrt gegen entsperrt aufnehmen</h2>
-    <p class="hint">Das hier ist der eigentliche Test. Ziel: herausfinden, an welchem <b>Byte</b> der Scooter dauerhaft anzeigt, ob er gedrosselt (22) oder frei (65) ist. Der Tempomat taugt dafür nicht, weil er am Blade sofort wieder auf Aus springt. Es wird <b>nichts gesendet</b>, die Seite liest nur mit.</p>
+    <h2 data-t="lockTestTitle"></h2>
+    <p class="hint" data-t="lockTestIntro"></p>
     <ol class="hint">
-      <li><b>Verbinden</b> (Karte oben). Ein paar Sekunden streamen lassen.</li>
-      <li>Scooter in den <b>gesperrten</b> Zustand bringen (22). Rund 10 Sekunden warten, damit <span class="mono">55 71</span> sicher durchläuft.</li>
-      <li>Scooter mit deiner bisher funktionierenden Methode <b>entsperren</b> (65). Wieder rund 10 Sekunden warten.</li>
-      <li>Unten auf <b>Inventar kopieren</b> tippen und mir den ganzen Text schicken.</li>
+      <li data-t="lockStep1"></li>
+      <li data-t="lockStep2"></li>
+      <li data-t="lockStep3"></li>
+      <li data-t="lockStep4"></li>
     </ol>
-    <p class="hint">Weil die Seite <b>jede abweichende Ausprägung</b> eines Rahmens einzeln behält, hat <span class="mono">55 71</span> danach zwei Ausprägungen (gesperrt und entsperrt). Die neue Zeile <b>DIFF über Ausprägungen</b> zeigt dann genau das Byte, das sich unterscheidet und bleibt. Beachte besonders <span class="mono">Byte17 Systemstatus</span>, <span class="mono">Bit6</span> und <span class="mono">Speed-Limit</span>. Achte darauf, während der Aufnahme <b>nicht den Gang zu wechseln</b>, sonst ändert sich Byte3 mit.</p>
+    <p class="hint" data-t="lockTestNote"></p>
   </div>
 
   <div class="card">
-    <h2>Tempomat senden (entsperren/sperren auf dieser Seite)</h2>
-    <p class="warn">Bluetooth ist exklusiv: du kannst nicht gleichzeitig mit der Teverun-App verbunden sein. Darum senden diese Knöpfe den Tempomat-Befehl direkt von hier. Es geht der normale <span class="mono">0x18</span>-Einstellungsrahmen raus, alle übrigen Werte werden aus dem letzten <span class="mono">55 71</span> unverändert gespiegelt, nur der Tempomat ändert sich.</p>
+    <h2 data-t="cruiseTitle"></h2>
+    <p class="warn" data-t="cruiseWarn"></p>
     <div class="btns">
-      <button class="primary" id="btn-unlock-auto" disabled>Entsperren: Tempomat auto (1)</button>
-      <button id="btn-unlock-man" disabled>Entsperren: Tempomat manuell (2)</button>
-      <button id="btn-lock" disabled>Sperren: Tempomat aus (0)</button>
+      <button class="primary" id="btn-unlock-auto" data-t="btnUnlockAuto" disabled></button>
+      <button id="btn-unlock-man" data-t="btnUnlockMan" disabled></button>
+      <button id="btn-lock" data-t="btnLockCruise" disabled></button>
     </div>
-    <p class="hint">Der Tempomat-Befehl kippt im ESC die Klemme - das ist die <b>Aktion</b> zum Ent- und Sperren, und die steht fest. Zum <b>Erkennen</b>, ob der Blade gesperrt ist, taugt der Tempomat-Wert dagegen nicht, weil er sofort auf Aus zurückfällt. Diese Knöpfe schalten den Zustand also nur hin und her, damit die <b>DIFF</b>-Zeile bei <span class="mono">55 71</span> zeigt, welches Byte den Zustand <b>dauerhaft</b> trägt. Ablauf: erst <b>Verbinden</b> und warten, bis die Knöpfe aktiv werden; dann <b>Tempomat aus</b> senden und per Live-Cam prüfen (gedrosselt?); dann <b>Tempomat auto</b> (frei?); danach oben <b>Inventar kopieren</b> und mir schicken.</p>
+    <p class="hint" data-t="cruiseNote"></p>
   </div>
 
   <div class="card">
-    <h2>Baugruppen-Info anfordern (proType / proCode)</h2>
-    <p class="hint">Die Frames <span class="mono">55 44</span> (Display/Akku/Licht) und <span class="mono">55 45</span> (Motorcontroller = Blade-ESC) streamen nicht von selbst - sie sind Antworten auf eine Anforderung. Dieser Knopf sendet die Anforderungs-Frames; die Antworten erscheinen dann unten im Inventar mit proType und proCode. Damit finden wir den echten Firmware-Schlüssel des Blade-ESC.</p>
+    <h2 data-t="reqTitle"></h2>
+    <p class="hint" data-t="reqHint"></p>
     <div class="btns">
-      <button class="primary span2" id="btn-req-info" disabled>Baugruppen-Info anfordern</button>
+      <button class="primary span2" id="btn-req-info" data-t="btnReqInfo" disabled></button>
     </div>
   </div>
 
   <div class="card">
-    <h2>Was antwortet uns da</h2>
-    <p class="hint">Dafür wird <b>nichts gesendet</b>. Der Scooter meldet von sich aus, welche Baugruppen er kennt, mit Typ, Code und Version. Diese Seite liest nur mit. Die Liste füllt sich nach dem Verbinden von selbst, manche Angaben kommen erst nach ein paar Sekunden.</p>
+    <h2 data-t="invTitle"></h2>
+    <p class="hint" data-t="invIntro"></p>
     <pre class="copy" id="inv-out">-</pre>
-    <p class="hint"><b>nicht gemeldet</b> heißt, dass die Gegenstelle für diese Baugruppe nur Füllbytes schickt. Sie weiß dann selbst nichts davon, egal was verbaut ist. Unter der Übersicht steht jede empfangene Rahmenart einzeln, und darin <b>jede abweichende Ausprägung eigen</b> mit ihrer Häufigkeit: erst die rohen Bytes, darunter die Felder, soweit bekannt. Eine Rahmenart, die hier niemand auswertet, bleibt trotzdem sichtbar.</p>
+    <p class="hint" data-t="invNote"></p>
     <div class="row">
-      <button id="btn-inv-copy" disabled>Inventar kopieren</button>
+      <button id="btn-inv-copy" data-t="btnInvCopy" disabled></button>
     </div>
   </div>
 
   <div class="card">
-    <h2>Node-Abfrage</h2>
-    <p class="hint">Fragt eine Baugruppe, ob sie hinter dieser Bluetooth-Verbindung erreichbar ist und ob sie ein Update annehmen könnte. Es wird <b>nur gefragt</b>. Der Befehl, der ein Update tatsächlich beginnt, ist ein anderer und steht in dieser Seite nirgends.</p>
+    <h2 data-t="probeTitle"></h2>
+    <p class="hint" data-t="probeIntro"></p>
     <div class="row">
-      <label class="full" for="probe-node">Baugruppe</label>
+      <label class="full" for="probe-node" data-t="lblNode"></label>
       <select id="probe-node" disabled></select>
-      <button id="btn-probe" disabled>Abfragen</button>
+      <button id="btn-probe" data-t="btnProbe" disabled></button>
     </div>
     <div class="row">
-      <button id="btn-probe-all" disabled>Alle nacheinander abfragen</button>
+      <button id="btn-probe-all" data-t="btnProbeAll" disabled></button>
     </div>
-    <p class="warn"><b>Wonach wir suchen.</b> Schon <i>irgendeine</i> gültige Antwort beweist, dass die Gegenstelle hinter Bluetooth dieses Update-Protokoll überhaupt spricht. Ein „Projektcode passt nicht" beweist zusätzlich, dass die genannte Baugruppe erreichbar ist und geflasht werden könnte. Bleibt alles still, gibt es diesen Weg auf diesem Gerät nicht.</p>
-    <p class="hint">Die Anfrage nennt absichtlich einen Projektcode, den keine Baugruppe haben kann. Damit ist die freundlichste mögliche Antwort „Code passt nicht", und ein versehentliches Ja kann es nicht geben.</p>
+    <p class="warn" data-t="probeWarn"></p>
+    <p class="hint" data-t="probeNote"></p>
     <pre class="copy" id="probe-out">-</pre>
     <div class="row">
-      <button id="btn-probe-copy" disabled>Protokoll kopieren</button>
+      <button id="btn-probe-copy" data-t="btnProbeCopy" disabled></button>
     </div>
   </div>
 
   <div class="card">
-    <h2>FIN schreiben</h2>
+    <h2 data-t="finTitle"></h2>
     <div class="row">
-      <label class="full" for="fin-in">Neue FIN</label>
-      <input id="fin-in" type="text" maxlength="16" spellcheck="false" autocapitalize="characters" placeholder="erst verbinden" disabled>
-      <button id="btn-set" disabled>Schreiben</button>
+      <label class="full" for="fin-in" data-t="lblNewFin"></label>
+      <input id="fin-in" type="text" maxlength="16" spellcheck="false" autocapitalize="characters" data-t-ph="finPhIdle" placeholder="erst verbinden" disabled>
+      <button id="btn-set" data-t="btnWrite" disabled></button>
     </div>
     <div class="row">
-      <button id="btn-restore" disabled>Ursprüngliche FIN zurückschreiben</button>
+      <button id="btn-restore" data-t="btnRestore" disabled></button>
     </div>
-    <p class="hint">Höchstens 16 Zeichen, nur ASCII. Das erste Zeichen muss druckbar sein, die Steuerung prüft es gegen den Bereich 0x30 bis 0x7A. Kürzere Namen füllt der Befehl mit Leerzeichen auf, so wie die Firmware selbst.</p>
-    <p class="hint" id="orig-line">Beim Verbinden gemerkt: <span class="mono" id="orig-name">-</span></p>
-    <p class="warn"><b>Diese Seite speichert deine FIN im Browser.</b> Damit „Ursprüngliche FIN zurückschreiben" auch nach einem Neuladen noch weiß, worauf es zurücksetzen soll, legt die Seite den beim ersten Verbinden gelesenen Namen im lokalen Speicher deines Browsers ab, unter dem Schlüssel <span class="mono">fintest_orig_name</span>. Der Wert bleibt dort, bis du ihn unten löschst oder die Websitedaten entfernst. Er verlässt dein Gerät nicht: diese Seite darf laut ihrer eigenen Sicherheitsregel überhaupt keine Verbindung nach außen aufbauen.</p>
+    <p class="hint" data-t="finHint1"></p>
+    <p class="hint" id="orig-line"><span data-t="finRemembered"></span> <span class="mono" id="orig-name">-</span></p>
+    <p class="warn" data-t="finWarn"></p>
     <div class="row">
-      <button id="btn-forget" disabled>Gemerkte FIN aus dem Browser löschen</button>
+      <button id="btn-forget" data-t="btnForget" disabled></button>
     </div>
     <hr class="sep">
-    <p class="danger"><b>Nach dem Schreiben bricht die Verbindung ab.</b> Die Steuerung gibt den neuen Namen an das Bluetooth-Modul weiter und das startet die Werbung neu. Das ist erwartet: einmal neu verbinden, dann steht der neue Name in der Liste.</p>
+    <p class="danger" data-t="finDanger"></p>
   </div>
 
   <div class="card">
-    <h2>Gesendeter Befehl</h2>
-    <p class="hint">Die 20 Bytes, die zuletzt über Bluetooth hinausgegangen sind, als Hex. Aufbau: <b>AA</b> Anfang, <b>1F</b> Befehl für die FIN, dann 16 Namensbytes in ASCII mit Leerzeichen aufgefüllt, ein unbenutztes <b>FF</b> und am Ende die Prüfsumme CRC-8. Damit lässt sich gegen die Firmware prüfen, ob hier derselbe Befehl herausgeht wie aus der App.</p>
+    <h2 data-t="frameTitle"></h2>
+    <p class="hint" data-t="frameHint"></p>
     <pre class="copy" id="frame">-</pre>
   </div>
 
   <div class="card">
-    <h2>Protokoll</h2>
+    <h2 data-t="logTitle"></h2>
     <div class="log-opts">
-      <label class="log-opt"><span>Öffentliches Protokoll (anonymisiert)</span><input type="checkbox" id="public-log" checked></label>
-      <label class="log-opt"><span>Diagnose (ausführlich)</span><input type="checkbox" id="diag-log"></label>
+      <label class="log-opt"><span data-t="logPublic"></span><input type="checkbox" id="public-log" checked></label>
+      <label class="log-opt"><span data-t="logDiag"></span><input type="checkbox" id="diag-log"></label>
     </div>
     <div class="btns">
-      <button type="button" id="btn-copy-log">Kopieren</button>
-      <button type="button" id="btn-clear-log">Leeren</button>
-      <button type="button" id="btn-save-log" class="span2">Speichern</button>
+      <button type="button" id="btn-copy-log" data-t="btnCopyLog"></button>
+      <button type="button" id="btn-clear-log" data-t="btnClearLog"></button>
+      <button type="button" id="btn-save-log" class="span2" data-t="btnSaveLog"></button>
     </div>
     <pre id="log"></pre>
-    <p class="hint"><span class="log-tx">TX - gesendet</span>, <span class="log-rx">RX - empfangen</span>. Das Protokoll ist technisch (Englisch/ASCII), unabhängig von der Sprache der Seite. Anonymisiert werden Geräte-ID, MAC und lange Hex-Werte.</p>
+    <p class="hint" data-t="logHint"></p>
   </div>
 
   <footer class="foot">
     <span class="foot-links">
-      <a href="#" data-doc="GUIDE">Anleitung</a>
-      <a href="https://github.com/Laufbursche42/tr-blade-test" target="_blank" rel="noopener">Quellcode</a>
-      <a href="#" data-doc="README">Readme</a>
-      <a href="#" data-doc="DISCLAIMER">Haftungsausschluss</a>
-      <a href="#" data-doc="LICENSE">Lizenz</a>
-      <a href="#" data-doc="PRIVACY">Datenschutz</a>
-      <a href="#" data-doc="TRADEMARKS">Marken</a>
+      <a href="#" data-doc="GUIDE" data-t="footGuide"></a>
+      <a href="https://github.com/Laufbursche42/tr-blade-test" target="_blank" rel="noopener" data-t="footSource"></a>
+      <a href="#" data-doc="README" data-t="footReadme"></a>
+      <a href="#" data-doc="DISCLAIMER" data-t="footDisclaimer"></a>
+      <a href="#" data-doc="LICENSE" data-t="footLicense"></a>
+      <a href="#" data-doc="PRIVACY" data-t="footPrivacy"></a>
+      <a href="#" data-doc="TRADEMARKS" data-t="footTrademarks"></a>
     </span>
     <span class="ver" id="build-ver"></span>
     <a class="foot-copy" href="https://laufbursche42.github.io/Laufbursche42/" target="_blank" rel="noopener">Copyright (c) 2026 Laufbursche</a>
@@ -172,10 +178,11 @@
   </div>
   <div class="doc-body" id="doc-body"></div>
   <div class="doc-foot">
-    <button type="button" id="doc-close">Schließen</button>
+    <button type="button" id="doc-close" data-t="docClose"></button>
   </div>
 </dialog>
 
-<script src="app.js?v=24"></script>
+<script src="i18n.js?v=25"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>

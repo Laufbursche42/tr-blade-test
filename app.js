@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v24';
+const BUILD = 'v25';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -918,8 +918,8 @@ function onDisconnected() {
   writeChar = null;
   writeUuid = null;
   notifyUuids = [];
-  setStatus('disconnected', 'getrennt');
-  $('btn-conn').textContent = 'Verbinden';
+  setStatus('disconnected', t('stDisconnected'));
+  $('btn-conn').textContent = t('btnConnect');
   $('fin-in').disabled = true;
   $('btn-set').disabled = true;
   S.received71 = false;
@@ -936,7 +936,7 @@ async function pickAndConnect() {
     return;
   }
   try {
-    setStatus('linking', 'waehlen ...');
+    setStatus('linking', t('stChoosing'));
     // The chooser is narrowed to a scooter identity, TDE... or T1DE..., so the list
     // stays readable. Nothing beyond the name is checked: the write itself never
     // asks which model this is.
@@ -945,7 +945,7 @@ async function pickAndConnect() {
       optionalServices: OPTIONAL_SERVICES,
     });
   } catch (e) {
-    setStatus('disconnected', 'getrennt');
+    setStatus('disconnected', t('stDisconnected'));
     log('chooser cancelled');
     return;
   }
@@ -954,7 +954,7 @@ async function pickAndConnect() {
 
 async function connectTo(dev) {
   try {
-    setStatus('linking', 'verbinden ...');
+    setStatus('linking', t('stConnecting'));
     rxCount = 0;
     rxLastUuid = null;
     resetInventory();
@@ -965,7 +965,7 @@ async function connectTo(dev) {
     log('device chosen ' + sens(dev.name || '(no name)'));
     const server = await dev.gatt.connect();
 
-    $('dev-name').textContent = dev.name || '(ohne Namen)';
+    $('dev-name').textContent = dev.name || t('noName');
     if (dev.name) {
       // The advertised name IS the identity, so this is the value to write back.
       if (!originalName) {
@@ -1036,10 +1036,10 @@ async function connectTo(dev) {
 
     buildProfile(services).catch(e => log('device profile incomplete: ' + (e && e.message ? e.message : e), 'log-err'));
 
-    setStatus('connected', 'verbunden');
-    $('btn-conn').textContent = 'Trennen';
+    setStatus('connected', t('stConnected'));
+    $('btn-conn').textContent = t('btnDisconnect');
     $('fin-in').disabled = false;
-    $('fin-in').placeholder = 'z. B. T1DE0000000000';
+    $('fin-in').placeholder = t('finPhConnected');
     $('btn-set').disabled = false;
     refreshOrigUi();
     setProbeBusy(false);
@@ -1052,7 +1052,7 @@ async function connectTo(dev) {
     }, CONNECT_CODE_INTERVAL_MS);
   } catch (e) {
     log('connect failed: ' + (e && e.message ? e.message : e), 'log-err');
-    setStatus('disconnected', 'getrennt');
+    setStatus('disconnected', t('stDisconnected'));
   }
 }
 
@@ -1079,12 +1079,12 @@ function validate(name) {
 async function writeName(name) {
   const bad = validate(name);
   if (bad) { log('rejected: ' + bad, 'log-err'); return; }
-  setStatus('writing', 'schreiben ...');
+  setStatus('writing', t('stWriting'));
   log('writing FIN ' + sens(name), 'log-tx');
   await send(setDeviceNameFrame(name), 'FIN write');
   log('written; the controller stores it in EEPROM and hands it to the Bluetooth module');
   log('the link drops on write; reconnect once afterwards');
-  if (device && device.gatt.connected) setStatus('connected', 'verbunden');
+  if (device && device.gatt.connected) setStatus('connected', t('stConnected'));
 }
 
 // ── document viewer (trbm-unlock model) ──────────────────────────────────────
@@ -1182,12 +1182,12 @@ function openDocFile(file, anchor) {
     if (target) body.scrollTop = target.offsetTop - body.offsetTop;
   };
   if (docCache[file]) { show(docCache[file]); return; }
-  body.innerHTML = '<p>' + escHtml('wird geladen ...') + '</p>';   // scan-ok: escaped literal
+  body.innerHTML = '<p>' + escHtml(t('docLoading')) + '</p>';   // scan-ok: escaped i18n value
   fetch(file + '?v=' + BUILD)
     .then(r => { if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.text(); })
     .then(txt => { docCache[file] = mdToHtml(txt); show(docCache[file]); })
     .catch(e => {
-      body.innerHTML = '<p>' + escHtml('Das Dokument konnte nicht geladen werden.') + '</p><pre>'   // scan-ok: escaped
+      body.innerHTML = '<p>' + escHtml(t('docFail')) + '</p><pre>'   // scan-ok: escaped i18n value
                      + escHtml(file + ': ' + (e && e.message ? e.message : e)) + '</pre>';
     });
 }
@@ -1216,6 +1216,13 @@ function wireDocViewer() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  // i18n first: wire the DE/EN toggle and paint the static [data-t] markup in the active
+  // language, then set the initial status through t() so the mismatch check below can still
+  // override it. Node options get a second applyLang() once they are built.
+  initLangSwitch();
+  applyLang();
+  setStatus('disconnected', t('stDisconnected'));
+
   // First thing, before anything can throw on a missing element. The build number in
   // the footer comes from this file, and this file is always fetched fresh because its
   // address carries the version. index.html carries no version of its own, so it can be
@@ -1224,7 +1231,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const pageBuild = (document.body.dataset && document.body.dataset.build) || '(keine Angabe)';
   const missing = REQUIRED_IDS.filter(id => !$(id));
   if (pageBuild !== BUILD || missing.length) {
-    if ($('status')) setStatus('disconnected', 'Seite veraltet');
+    if ($('status')) setStatus('disconnected', t('stStale'));
     log('WARNING: markup is ' + pageBuild + ', script is ' + BUILD, 'log-err');
     if (missing.length) log('missing elements: ' + missing.join(', '), 'log-err');
     log('page and script do not match; what you see is older than the footer build, which comes from the script', 'log-err');
@@ -1247,11 +1254,15 @@ window.addEventListener('DOMContentLoaded', () => {
   for (const n of NODES) {
     const o = document.createElement('option');
     o.value = String(n.id);
-    o.textContent = n.id + '  ' + n.text;
+    o.setAttribute('data-t', 'node' + n.id);   // label injected by applyLang; the id prefix is part of the value
+    o.textContent = n.id + '  ' + n.text;       // fallback until applyLang runs
     sel.appendChild(o);
   }
   renderReport();
   renderInventory();
+
+  // Re-apply now that the node options carry their data-t labels.
+  applyLang();
 
   on('btn-probe', 'click', () => {
     const id = parseInt(sel.value, 10);
