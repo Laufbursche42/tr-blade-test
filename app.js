@@ -11,7 +11,7 @@
 
 'use strict';
 
-const BUILD = 'v28';
+const BUILD = 'v29';
 
 // Candidate GATT services the Teverun Bluetooth module exposes. The ISSC transparent
 // UART is the usual one; cheap modules use a 16-bit UUID from the vendor range, so the
@@ -85,7 +85,7 @@ const REQUIRED_IDS = ['status', 'log', 'frame', 'build-ver', 'dev-name', 'svc-na
 function applyTheme(dark) {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const b = $('btn-theme');
-  if (b) { b.innerHTML = dark ? '&#9728;' : '&#9790;'; b.setAttribute('aria-label', t(dark ? 'themeToLight' : 'themeToDark')); b.title = b.getAttribute('aria-label'); }   // scan-ok: a fixed character, not user input
+  if (b) { b.textContent = dark ? '\u2600' : '\u263E'; b.setAttribute('aria-label', t(dark ? 'themeToLight' : 'themeToDark')); b.title = b.getAttribute('aria-label'); }
   try { localStorage.setItem(LS_THEME, dark ? 'dark' : 'light'); } catch (e) {}
 }
 function initTheme() {

@@ -2,6 +2,8 @@
 
 > **Testwerkzeug, kein Tuning-Werkzeug.** Diese Seite ist eine Machbarkeitsstudie, kein fertiges Produkt. Sie tunt, entdrosselt oder entsperrt keinen Roller. Sie schreibt nur die Geräte-Identität (die FIN) und prüft, ob Baugruppen hinter Bluetooth erreichbar sind. Fehlerfreier Betrieb wird nicht versprochen, es gibt keinerlei Gewährleistung. Was du hier tust, tust du auf eigenes Risiko.
 
+> **Wichtig für Fehler-Reports:** Schalte unten auf der Seite den **Diagnose-Log** ein, *bevor* du dich mit dem Scooter verbindest. Nur dann wird der komplette Verbindungsaufbau mitgeschnitten - und genau diese Zeilen brauchen wir in einem [Ticket](https://github.com/Laufbursche42/Laufbursche42/issues), um ein Problem nachzuvollziehen.
+
 ## 1. Was du brauchst
 
 Alles passiert im Browser über Web Bluetooth, es gibt nichts zu installieren. Gebraucht wird:

@@ -2,6 +2,8 @@
 
 > **Test tool, not a tuning tool.** This page is a feasibility study, not a finished product. It does not tune, derestrict or unlock any scooter. It only writes the device identity (the FIN) and tests whether assemblies are reachable behind Bluetooth. Error-free operation is not promised, there is no warranty of any kind. Whatever you do here, you do at your own risk.
 
+> **Important for error reports:** switch on the **Diagnostic log** at the bottom of the page *before* you connect to the scooter. Only then is the full connection handshake captured - and those are exactly the lines we need in a [ticket](https://github.com/Laufbursche42/Laufbursche42/issues) to reproduce a problem.
+
 ## 1. What you need
 
 Everything happens in the browser over Web Bluetooth, there is nothing to install. All you need is:
