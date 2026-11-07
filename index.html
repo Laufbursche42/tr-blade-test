@@ -5,13 +5,14 @@
 <!-- No frame-ancestors here: a browser ignores it in a meta element, it only works as an
      HTTP header, and GitHub Pages sends no custom headers. It would only log a warning. -->
 <!-- connect-src 'self': the doc viewer fetches this site's own .md files; still no external network. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; connect-src 'self' https://cloudflareinsights.com; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Laufbursche Blade-Test</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg?v=29">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=29">
 <link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png?v=29">
 <link rel="stylesheet" href="styles.css?v=29">
+<!-- Cloudflare Web Analytics --><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "1f2a3915448b4b68b4380423f2be4b09"}'></script><!-- scan-ok: Cloudflare Web Analytics beacon (token starts 1f2a39 ends 4b09); cookieless aggregate page metrics, see PRIVACY -->
 </head>
 <body data-build="v29">
 <div class="wrap">
