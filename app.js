@@ -1335,22 +1335,3 @@ window.addEventListener('DOMContentLoaded', () => {
   on('btn-lock', 'click', () => sendCruise(0));
   on('fin-in', 'keydown', e => { if (e.key === 'Enter') $('btn-set').click(); });
 });
-
-/* Deprecation gate overlay: lock the page until the user dismisses it. Self-contained. */
-(function () {
-  function wireSunsetGate() {
-    var ov = document.getElementById('sunset-overlay');
-    var btn = document.getElementById('sunset-overlay-x');
-    if (!ov || !btn) return;
-    document.body.classList.add('sunset-locked');
-    btn.addEventListener('click', function () {
-      ov.hidden = true;
-      document.body.classList.remove('sunset-locked');
-    });
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wireSunsetGate);
-  } else {
-    wireSunsetGate();
-  }
-})();
