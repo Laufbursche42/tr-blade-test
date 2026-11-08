@@ -12,6 +12,9 @@ window.I18N = {
     themeToLight: "Auf helle Darstellung umschalten",
     themeToDark: "Auf dunkle Darstellung umschalten",
 
+    sunsetBannerHtml: "<b>Dieses Tool zieht um.</b> Dieses Repo wird <b>nicht mehr weiterentwickelt</b> - bitte wechsle zum neuen Tool: <a href=\"https://lb-tool-web.pages.dev/\" target=\"_blank\" rel=\"noopener\">lb-tool-web.pages.dev</a>. Probleme beim Wechsel? Öffne ein <a href=\"https://github.com/Laufbursche42/Laufbursche42/issues/new\" target=\"_blank\" rel=\"noopener\">Issue auf GitHub</a> oder schick eine <a href=\"https://www.escooter-stammtisch.de/index.php?user/6497-laufbursche/\" target=\"_blank\" rel=\"noopener\">PN im eScooter-Stammtisch</a>.",
+    sunsetTitle: "Dieses Tool zieht um",
+    sunsetDismiss: "Verstanden, weiter zur Seite",
     s1Title: "Wozu das hier ist",
     about1: "Verbinden und die FIN des Scooters schreiben, nichts weiter. Die Liste zeigt Geräte, deren Name mit <b>TDE</b>, <b>T1</b> oder <b>TEU</b> beginnt. Geprüft wird der Anfang, also sind <b>TDE1</b>, <b>T1DE</b> und <b>TEU1</b> ebenfalls dabei. Welches Modell dahinter steckt, fragt diese Seite nicht.",
     about2: "Die FIN ist der Bluetooth-Name des Scooters. Sie landet im EEPROM der Steuerung und überlebt den Neustart. Schreib dir den ursprünglichen Wert auf, bevor du ihn änderst.",
@@ -304,6 +307,9 @@ window.I18N = {
     themeToLight: "Switch to light theme",
     themeToDark: "Switch to dark theme",
 
+    sunsetBannerHtml: "<b>This tool is moving.</b> This repository is <b>no longer maintained</b> - please switch to the new tool: <a href=\"https://lb-tool-web.pages.dev/\" target=\"_blank\" rel=\"noopener\">lb-tool-web.pages.dev</a>. Trouble switching? Open an <a href=\"https://github.com/Laufbursche42/Laufbursche42/issues/new\" target=\"_blank\" rel=\"noopener\">issue on GitHub</a> or send a <a href=\"https://www.escooter-stammtisch.de/index.php?user/6497-laufbursche/\" target=\"_blank\" rel=\"noopener\">PM on the eScooter-Stammtisch forum</a>.",
+    sunsetTitle: "This tool is moving",
+    sunsetDismiss: "Got it, continue to the page",
     s1Title: "What this is for",
     about1: "Connect and write the scooter's FIN, nothing more. The list shows devices whose name starts with <b>TDE</b>, <b>T1</b> or <b>TEU</b>. The start is checked, so <b>TDE1</b>, <b>T1DE</b> and <b>TEU1</b> are included too. This page does not ask which model is behind it.",
     about2: "The FIN is the scooter's Bluetooth name. It is stored in the controller's EEPROM and survives a restart. Write down the original value before you change it.",
